@@ -31,6 +31,19 @@ Admin-PIN og reset-PIN står i `.env.example` (`ADMIN_PIN`, `RESET_PIN`). Ikke c
 | `npm run lint` | TypeScript-sjekk |
 | `npm run test:all` | Kjør testharnesen |
 
+## Prosjektdokumentasjon
+
+Full indeks over kodebasen: **[docs/prosjekt/](./docs/prosjekt/README.md)**
+
+| Dokument | Innhold |
+| --- | --- |
+| [Oversikt](./docs/prosjekt/README.md) | Mappestruktur, roller, funksjonsområder |
+| [Arkitektur](./docs/prosjekt/arkitektur.md) | Lag, persistens, auth, push |
+| [Datamodell](./docs/prosjekt/datamodell.md) | AppState og entiteter |
+| [API](./docs/prosjekt/api.md) | Alle REST-endepunkter |
+| [Frontend](./docs/prosjekt/frontend.md) | Komponenter og navigasjon |
+| [Tester](./docs/prosjekt/tester.md) | Testskript og dekning |
+
 ## Mer dokumentasjon
 
 - `PRODUCT_REQUIREMENTS.md` — produktkrav og arkitektur
