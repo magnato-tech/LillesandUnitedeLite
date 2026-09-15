@@ -1,0 +1,53 @@
+{
+  "name": "react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js",
+    "lint": "tsc --noEmit",
+    "test:walkovers": "tsx scripts/test-walkovers.ts",
+    "test:duplicate-names": "tsx scripts/test-duplicate-names.ts",
+    "test:consistency": "tsx scripts/test-db-consistency.ts",
+    "test:firestore": "tsx scripts/test-firestore-integration.ts",
+    "test:cup-16": "tsx scripts/test-complete-16-cup.ts",
+    "test:cup-63": "tsx scripts/test-cup-63-players.ts",
+    "test:resets": "tsx scripts/test-tournament-resets.ts",
+    "test:populate-reset": "tsx scripts/test-populate-and-reset.ts",
+    "test:load-500": "tsx scripts/test-load-500.ts",
+    "validate:db": "tsx scripts/validate-db.ts",
+    "test:push": "tsx scripts/test-push-notifications.ts",
+    "test:all": "tsx scripts/test-walkovers.ts && tsx scripts/test-duplicate-names.ts && tsx scripts/test-db-consistency.ts && tsx scripts/test-firestore-integration.ts && tsx scripts/test-push-notifications.ts && tsx scripts/test-populate-and-reset.ts && tsx scripts/test-load-500.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.4.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "canvas-confetti": "^1.9.4",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "firebase": "^12.18.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^6.2.3",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/web-push": "^3.6.4",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  }
+}

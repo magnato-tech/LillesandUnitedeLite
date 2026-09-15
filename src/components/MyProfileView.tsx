@@ -1,0 +1,610 @@
+import React, { useState, useMemo } from 'react';
+import {
+  User,
+  UserCheck,
+  RotateCcw,
+  Trophy,
+  Popcorn,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Clock,
+  Edit2,
+  ChevronRight,
+  UserMinus,
+} from 'lucide-react';
+import { AppState, PopcornBong, Person, Participant } from '../types';
+import { getUserToken, saveUserTokenForName } from '../lib/userProfile';
+import { calculatePlayerQueueStatus } from '../lib/tournament-notifications';
+import {
+  activatePopcornBong,
+  registerParticipant,
+  registerAlphaInterest,
+  renameUser,
+  withdrawTournamentParticipant,
+} from '../services/api';
+
+interface MyProfileViewProps {
+  state: AppState;
+  myPlayerName: string | null;
+  onSetMyPlayer: (name: string | null) => void;
+  onRefreshState: () => void;
+  onGoToTab: (tab: 'home' | 'tabletennis' | 'alpha' | 'kiosk') => void;
+  activePersonId?: string | null;
+  activePerson?: Person | null;
+}
+
+export const MyProfileView: React.FC<MyProfileViewProps> = ({
+  state,
+  myPlayerName,
+  onSetMyPlayer,
+  onRefreshState,
+  onGoToTab,
+  activePersonId = null,
+  activePerson: activePersonProp = null,
+}) => {
+  const [editingName, setEditingName] = useState(false);
+  const [newNameInput, setNewNameInput] = useState('');
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const activePerson = activePersonProp;
+
+  const currentUserName = activePerson?.firstName || ((myPlayerName && myPlayerName.trim()) ? myPlayerName.trim() : null);
+  const userToken = useMemo(() => {
+    if (activePerson?.anonymousToken) return activePerson.anonymousToken;
+    return getUserToken(currentUserName);
+  }, [activePerson, currentUserName]);
+
+  // Find user's popcorn bong
+  const userBong = useMemo((): PopcornBong | null => {
+    if (!state.popcorn?.bongs) return null;
+    if (activePersonId) {
+      return state.popcorn.bongs.find((b) => b.personId === activePersonId) || null;
+    }
+    if (userToken) {
+      return state.popcorn.bongs.find((b) => b.clientToken === userToken) || null;
+    }
+    return null;
+  }, [state.popcorn, activePersonId, userToken]);
+
+  // Find user's table tennis registration
+  const participant = useMemo(() => {
+    if (activePersonId) {
+      const byPerson = state.tournament?.participants.find((p) => p.personId === activePersonId);
+      if (byPerson) return byPerson;
+    }
+    if (!currentUserName) return null;
+    return state.tournament?.participants.find(
+      (p) =>
+        (p.userId && p.userId === userToken) ||
+        p.firstName.toLowerCase() === currentUserName.toLowerCase()
+    ) || null;
+  }, [state.tournament, activePersonId, currentUserName, userToken]);
+
+  // Find user's Alpha interest
+  const alphaInterest = useMemo(() => {
+    if (!currentUserName) return null;
+    return state.alphaInterests?.find(
+      (a) =>
+        (a.userId && a.userId === userToken) ||
+        a.firstName.toLowerCase() === currentUserName.toLowerCase()
+    ) || null;
+  }, [state.alphaInterests, currentUserName, userToken]);
+
+  // Table tennis match / turn details
+  const tableTennisStatus = useMemo(() => {
+    if (!state.tournament) return null;
+    const status = calculatePlayerQueueStatus(
+      state.tournament,
+      activePerson?.id,
+      currentUserName || participant?.firstName
+    );
+    if (!status || !status.isRegistered) return null;
+
+    return {
+      stage: status.stage,
+      title: status.title,
+      details: status.description,
+      matchesAhead: status.matchesAhead,
+    };
+  }, [participant, state.tournament, activePerson, currentUserName]);
+
+  // Actions
+  const handleClaimPopcorn = async () => {
+    setLoadingAction('popcorn');
+    setActionError(null);
+    try {
+      await activatePopcornBong(
+        userToken,
+        activePerson?.displayId || currentUserName || undefined,
+        activePersonId || undefined
+      );
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke aktivere popcornbong.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleRegisterTableTennis = async () => {
+    if (!activePerson) {
+      setActionError('Du må velge eller opprette en profil før du melder deg på bordtennis.');
+      setEditingName(true);
+      return;
+    }
+    setLoadingAction('tabletennis');
+    setActionError(null);
+    try {
+      await registerParticipant(
+        activePerson.firstName,
+        undefined,
+        activePerson.id,
+        activePerson.anonymousToken
+      );
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke melde på til bordtennis.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleWithdrawTableTennis = async () => {
+    if (!participant) return;
+    if (!window.confirm(`Vil du trekke ${participant.firstName} fra bordtennisturneringen?`)) {
+      return;
+    }
+    setLoadingAction('tabletennis');
+    setActionError(null);
+    try {
+      await withdrawTournamentParticipant({
+        participantId: participant.id,
+        personId: activePersonId || undefined,
+        anonymousToken: activePerson?.anonymousToken || userToken || undefined,
+      });
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke trekke påmelding.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleRegisterAlpha = async () => {
+    if (!currentUserName) {
+      setEditingName(true);
+      return;
+    }
+    setLoadingAction('alpha');
+    setActionError(null);
+    try {
+      await registerAlphaInterest(currentUserName, undefined, undefined, userToken);
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke melde interesse for Alpha.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNameInput.trim()) return;
+    const cleanNew = newNameInput.trim();
+    setLoadingAction('rename');
+    setActionError(null);
+    try {
+      await renameUser(userToken, cleanNew, currentUserName || undefined);
+      saveUserTokenForName(cleanNew, userToken);
+      onSetMyPlayer(cleanNew);
+      setEditingName(false);
+      setNewNameInput('');
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke endre navn.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleLogout = () => {
+    onSetMyPlayer(null);
+    onRefreshState();
+  };
+
+  return (
+    <div id="my-profile-view" className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8">
+      {/* Top Profile Header Card */}
+      <div className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-artistic-md mb-8 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-lime-400 text-zinc-950 flex items-center justify-center font-black shadow-artistic-sm -rotate-1">
+              <User className="w-8 h-8" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-lime-400 uppercase tracking-wider">
+                  Min arrangementsprofil
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-bold border border-zinc-700">
+                  Lillesand United
+                </span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase mt-0.5 flex items-center gap-3">
+                👤 {currentUserName || 'Gjest (ikke navngitt)'}
+              </h1>
+              <p className="text-xs text-zinc-400 mt-1">
+                Felles profil for bordtenniscup, gratis popcorn og UngdomsAlpha.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap">
+            {currentUserName && (
+              <button
+                id="btn-rename-user"
+                type="button"
+                onClick={() => {
+                  setNewNameInput(currentUserName || '');
+                  setEditingName(true);
+                }}
+                className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-artistic-sm"
+                title="Endre fornavn på samme profil"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-lime-400" />
+                <span>Bytt navn</span>
+              </button>
+            )}
+
+            {currentUserName && (
+              <button
+                id="btn-logout-user"
+                type="button"
+                onClick={handleLogout}
+                className="px-3 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-rose-300 hover:text-rose-200 border border-zinc-800 hover:border-rose-800/60 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-artistic-sm"
+                title="Logger ut denne enheten og lar en annen deltaker registrere seg"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+                <span>Logg ut / Bytt bruker</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Rename Input Form */}
+        {editingName && (
+          <form
+            onSubmit={handleRename}
+            className="mt-5 p-4 bg-zinc-950 rounded-2xl border-2 border-lime-400/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
+          >
+            <div className="flex-1">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-1">
+                Skriv inn nytt fornavn (beholder samme bruker-ID, popcornbong og aktiviteter):
+              </label>
+              <input
+                type="text"
+                value={newNameInput}
+                onChange={(e) => setNewNameInput(e.target.value)}
+                placeholder="Fornavn"
+                autoFocus
+                required
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white font-bold focus:outline-none focus:border-lime-400"
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-2 sm:pt-4">
+              <button
+                type="submit"
+                disabled={loadingAction === 'rename' || !newNameInput.trim()}
+                className="px-4 py-2 bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm disabled:opacity-50"
+              >
+                {loadingAction === 'rename' ? 'Oppdaterer...' : 'Lagre navn'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingName(false)}
+                className="px-3 py-2 text-zinc-400 hover:text-white text-xs font-bold"
+              >
+                Avbryt
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {actionError && (
+        <div className="mb-6 p-4 bg-rose-950/60 border-2 border-rose-800 rounded-2xl text-rose-200 text-sm flex items-center gap-2.5">
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+          <span>{actionError}</span>
+        </div>
+      )}
+
+      {/* 3 Main Activity Status Modules */}
+      <div className="space-y-6">
+        {/* 1. BORDTENNISCUP */}
+        <div
+          id="profile-tabletennis-card"
+          className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-artistic-md relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-lime-400/20 border border-lime-400/40 text-lime-400 flex items-center justify-center font-black">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-lime-400 block">
+                  Aktivitet 1
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                  🏓 Bordtenniscup
+                </h3>
+              </div>
+            </div>
+
+            <div>
+              {participant ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-lime-400 text-zinc-950 font-black text-xs uppercase tracking-wider shadow-artistic-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Registrert ✓
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-700">
+                  Ikke registrert
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {participant ? (
+              <div className="space-y-3">
+                <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                  <div className="text-xs text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                    Spillerstatus
+                  </div>
+                  <div className="text-lg font-black text-white">
+                    {tableTennisStatus?.title || 'Påmeldt som ' + participant.firstName}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {tableTennisStatus?.details || 'Gjør deg klar for kamp!'}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onGoToTab('tabletennis')}
+                    className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>Åpne Bordtenniscup & Kamper</span>
+                    <ChevronRight className="w-4 h-4 text-lime-400" />
+                  </button>
+
+                  {state.tournament?.status === 'registration' && (
+                    <button
+                      type="button"
+                      disabled={loadingAction === 'tabletennis'}
+                      onClick={handleWithdrawTableTennis}
+                      className="px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                      title="Trekke påmelding fra bordtenniscupen"
+                    >
+                      <UserMinus className="w-4 h-4 text-rose-400" />
+                      <span>Meld av / Trekk påmelding</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-sm text-zinc-300 max-w-md">
+                  Bli med i den store turneringen! 2 bord, 21 poeng, walkovers og kåring av Lillesands råeste bordtennisspiller.
+                </p>
+                <button
+                  id="btn-profile-register-tabletennis"
+                  type="button"
+                  disabled={loadingAction === 'tabletennis' || state.tournament?.status === 'completed'}
+                  onClick={handleRegisterTableTennis}
+                  className="px-5 py-3 bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  {loadingAction === 'tabletennis' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Melder på...
+                    </>
+                  ) : (
+                    <>
+                      <Trophy className="w-4 h-4 text-zinc-950" />
+                      Meld meg på
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. POPCORN DIGITAL BONG */}
+        <div
+          id="profile-popcorn-card"
+          className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-artistic-md relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center font-black">
+                <Popcorn className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400 block">
+                  Aktivitet 2
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                  🍿 Gratis Popcorn
+                </h3>
+              </div>
+            </div>
+
+            <div>
+              {userBong?.status === 'used' ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-300 font-bold text-xs uppercase tracking-wider border border-zinc-700">
+                  <CheckCircle2 className="w-4 h-4 text-lime-400" />
+                  Bong #{userBong.number} – Hentet ✓
+                </span>
+              ) : userBong?.status === 'activated' ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-zinc-950 font-black text-xs uppercase tracking-wider shadow-artistic-sm animate-pulse">
+                  <Sparkles className="w-4 h-4" />
+                  Bong #{userBong.number} – Klar til henting
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-700">
+                  Ingen bong
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {userBong ? (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                <div className="flex items-center gap-4">
+                  <div className="px-5 py-2.5 bg-amber-500 text-zinc-950 rounded-xl font-black text-2xl font-mono shadow-artistic-sm">
+                    #{userBong.number}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-white">
+                      {userBong.status === 'used' ? 'Popcorn hentet ut' : 'Klar for henting i kiosken'}
+                    </h4>
+                    <p className="text-xs text-zinc-400">
+                      {userBong.status === 'used'
+                        ? `Bong #${userBong.number} er allerede levert ut til deg.`
+                        : `Vis nummer #${userBong.number} til personalet i kiosken for å få ditt beger.`}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onGoToTab('kiosk')}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                >
+                  Vis i kiosken
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-sm text-zinc-300 max-w-md">
+                  De første 100 som trykker får gratis nypoppet popcorn i kiosken. Bong tildeles i sekvensiell rekkefølge.
+                </p>
+                <button
+                  id="btn-profile-claim-popcorn"
+                  type="button"
+                  disabled={loadingAction === 'popcorn'}
+                  onClick={handleClaimPopcorn}
+                  className="px-5 py-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  {loadingAction === 'popcorn' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Henter bong...
+                    </>
+                  ) : (
+                    <>
+                      <Popcorn className="w-4 h-4 text-zinc-950" />
+                      Ta mot popcorn
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. UNGDOMSALPHA */}
+        <div
+          id="profile-alpha-card"
+          className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-artistic-md relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-sky-400/20 border border-sky-400/40 text-sky-400 flex items-center justify-center font-black">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-sky-400 block">
+                  Aktivitet 3
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                  ❤️ UngdomsAlpha
+                </h3>
+              </div>
+            </div>
+
+            <div>
+              {alphaInterest ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-400 text-zinc-950 font-black text-xs uppercase tracking-wider shadow-artistic-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Jeg er interessert ✓
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-700">
+                  Ikke registrert interesse
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {alphaInterest ? (
+              <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                    Status
+                  </div>
+                  <h4 className="text-base font-black text-white">
+                    Takk for interessen, {alphaInterest.firstName}!
+                  </h4>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Oppstart: Fredag 25. september kl. 19:00 i Lillesand. Gratis mat, filmer og gode samtaler helt uten press.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onGoToTab('alpha')}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+                >
+                  Les mer om kurset
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-sm text-zinc-300 max-w-md">
+                  Et trygt og morsomt sted for å utforske livet, tro og mening over gratis god mat og filmklipp. Helt uforpliktende!
+                </p>
+                <button
+                  id="btn-profile-interest-alpha"
+                  type="button"
+                  disabled={loadingAction === 'alpha'}
+                  onClick={handleRegisterAlpha}
+                  className="px-5 py-3 bg-sky-400 hover:bg-sky-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  {loadingAction === 'alpha' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Registrerer...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-zinc-950" />
+                      Jeg er interessert
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
