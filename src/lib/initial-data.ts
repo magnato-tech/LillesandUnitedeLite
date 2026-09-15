@@ -59,8 +59,8 @@ export const INITIAL_ACTIVITIES: Activity[] = [
   {
     id: 'act-kiosk',
     name: 'Kiosk & Varmmat',
-    shortDesc: 'Gratis popcorn til de første 100! Salg av pølser, brus og kioskvarer hele kvelden.',
-    fullDesc: 'De første 100 som kommer inn døra fra kl. 17:00 får gratis nypoppet popcorn! I kiosken kan du kjøpe varme pølser, iskald brus, sjokolade og snacks til ungdomsvennlige priser gjennom hele kvelden helt til avslutning kl. 22:00.',
+    shortDesc: 'Gratis popcorn – hent i kiosken når du kommer inn! Salg av pølser, brus og kioskvarer hele kvelden.',
+    fullDesc: 'Gratis popcorn – hent i kiosken når du kommer inn (til de første 100). I kiosken kan du kjøpe varme pølser, iskald brus, sjokolade og snacks gjennom hele kvelden.',
     iconName: 'Utensils',
     time: 'Kl. 17:00 – 22:00',
     location: 'Kioskområdet ved inngangen',

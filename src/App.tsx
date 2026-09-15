@@ -519,12 +519,9 @@ export default function App() {
                 state={state}
                 onGoToTableTennis={() => setCurrentTab('tabletennis')}
                 onGoToAlpha={() => setCurrentTab('alpha')}
-                myPlayerName={currentUserName}
-                onBongClaimed={loadLatestState}
+                onGoToKiosk={() => setCurrentTab('kiosk')}
                 activePersonId={activePersonId}
                 activePerson={effectiveActivePerson}
-                onCreatePerson={handleCreatePerson}
-                onGoToProfile={() => setCurrentTab('profile')}
               />
               <ActivityGrid
                 activities={state.activities}
@@ -573,15 +570,7 @@ export default function App() {
           )}
 
           {currentTab === 'kiosk' && (
-            <KioskSection
-              state={state}
-              myPlayerName={currentUserName}
-              onBongClaimed={loadLatestState}
-              activePersonId={activePersonId}
-              activePerson={effectiveActivePerson}
-              onCreatePerson={handleCreatePerson}
-              onGoToProfile={() => setCurrentTab('profile')}
-            />
+            <KioskSection state={state} />
           )}
 
           {currentTab === 'admin' && (

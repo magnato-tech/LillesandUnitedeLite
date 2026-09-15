@@ -10,7 +10,7 @@ React SPA uten React Router. Navigasjon skjer via `currentTab` state i `App.tsx`
 | `profile` | MyProfileView | Min side |
 | `tabletennis` | TableTennisView | Cup, kø, bracket, push |
 | `alpha` | AlphaView | UngdomsAlpha-info og påmelding |
-| `kiosk` | KioskSection | Meny og Vipps-handlekurv |
+| `kiosk` | KioskSection | Informativ meny (ingen handlekurv) |
 | `display` | DisplayScreen | Storskjerm (fullskjerm, egen layout) |
 | `admin` | AdminDashboard | Arrangørpanel (PIN) |
 
@@ -41,7 +41,7 @@ App.tsx
 │   ├── TableTennisView         # Cup-UX
 │   │   └── BracketView         # Bracket-visualisering
 │   ├── AlphaView               # Alpha-påmelding
-│   ├── KioskSection            # Kiosk + PopcornBongCard
+│   ├── KioskSection            # Informativ kioskmeny
 │   ├── DisplayScreen           # Storskjerm
 │   │   └── BracketView
 │   └── AdminDashboard          # 8 admin-underfaner

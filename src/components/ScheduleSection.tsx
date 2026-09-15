@@ -33,7 +33,7 @@ export const ScheduleSection: React.FC = () => {
               </span>
               <h4 className="font-black text-white uppercase text-xs">Dørene åpner</h4>
               <p className="text-zinc-400 text-[11px] mt-1 leading-snug">
-                Ankomst, påmelding til aktiviteter, åpen kiosk og gratis popcorn til 100 første!
+                Ankomst, påmelding til aktiviteter, åpen kiosk og gratis popcorn – hent i kiosken når du kommer inn!
               </p>
             </div>
           </div>

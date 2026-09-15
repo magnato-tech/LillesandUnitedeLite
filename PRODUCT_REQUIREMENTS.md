@@ -16,9 +16,9 @@ I den opprinnelige arrangementsbeskrivelsen (`src/lib/initial-data.ts`) ble kios
 - **Prinsippbrudd**: Dette representerer et avvik fra grunnregelen om at AI-agenten aldri skal utvide funksjonelt scope uten eksplisitt godkjenning.
 - **Presisering**: Den opprinnelige arrangementsbeskrivelsen i `initial-data.ts` var en ren informativ programtekst, og var **ikke** en godkjenning eller bestilling av et digitalt bong-system.
 - **Status for piloten (18. september)**:
-  - **STATUS: DEAKTIVERT FOR PILOTEN**.
-  - Funksjonen beholdes i koden og datamodellen, men er ikke aktiv under pilotgjennomføringen.
-  - Det skal ikke gjøres videreutvikling av popcorn-funksjonen nå.
+  - **STATUS: INFORMASJON I APPEN**.
+  - Ungdomsflaten viser kun tekst og lenke til kiosken. Ingen aktivering, bong-nummer eller handlekurv.
+  - Admin-API og datamodell for bonger kan fortsatt ligge i kodebasen, men brukes ikke av gjesteflaten.
 
 ---
 

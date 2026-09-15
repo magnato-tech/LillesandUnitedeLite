@@ -7,31 +7,19 @@ interface EventHeroProps {
   state: AppState;
   onGoToTableTennis: () => void;
   onGoToAlpha: () => void;
-  onClaimPopcorn?: () => void;
-  myPlayerName?: string | null;
-  onBongClaimed?: () => void;
+  onGoToKiosk: () => void;
   activePersonId?: string | null;
   activePerson?: Person | null;
-  onCreatePerson?: (firstName: string) => Promise<Person | null>;
-  onGoToProfile?: () => void;
 }
 
 export const EventHero: React.FC<EventHeroProps> = ({
   state,
   onGoToTableTennis,
   onGoToAlpha,
-  onClaimPopcorn,
-  myPlayerName,
-  onBongClaimed,
+  onGoToKiosk,
   activePersonId = null,
   activePerson = null,
-  onCreatePerson,
-  onGoToProfile,
 }) => {
-  const popcornPercent = Math.min(
-    100,
-    Math.round((state.event.popcornClaimedCount / state.event.freePopcornLimit) * 100)
-  );
 
   const isRegisteredInTournament = useMemo(() => {
     const participants = state.tournament?.participants || [];
@@ -64,18 +52,6 @@ export const EventHero: React.FC<EventHeroProps> = ({
       if (match) return true;
     }
 
-    // Player name prop
-    if (myPlayerName && myPlayerName.trim()) {
-      const clean = myPlayerName.trim().toLowerCase();
-      const match = participants.some(
-        (p) =>
-          (p.firstName && p.firstName.trim().toLowerCase() === clean) ||
-          (p.displayId && p.displayId.trim().toLowerCase() === clean) ||
-          (clean.includes('_') && p.firstName && p.firstName.trim().toLowerCase() === clean.split('_')[0])
-      );
-      if (match) return true;
-    }
-
     // Also check cached local player name if available
     try {
       if (typeof window !== 'undefined') {
@@ -95,7 +71,7 @@ export const EventHero: React.FC<EventHeroProps> = ({
     }
 
     return false;
-  }, [state.tournament?.participants, activePersonId, activePerson, myPlayerName]);
+  }, [state.tournament?.participants, activePersonId, activePerson]);
 
   return (
     <div className="relative overflow-hidden rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-md p-6 sm:p-10 mb-8">
@@ -166,17 +142,7 @@ export const EventHero: React.FC<EventHeroProps> = ({
       </div>
 
       {/* Free Popcorn Digital Bong Card */}
-      <PopcornBongCard
-        popcorn={state.popcorn}
-        variant="hero"
-        className="mb-8"
-        userName={myPlayerName}
-        onCreatePerson={onCreatePerson}
-        onBongClaimed={onBongClaimed}
-        activePersonId={activePersonId}
-        activePerson={activePerson}
-        onGoToProfile={onGoToProfile}
-      />
+      <PopcornBongCard variant="hero" className="mb-8" onGoToKiosk={onGoToKiosk} />
 
       {/* Action CTA Buttons */}
       <div className="flex flex-wrap items-center gap-4">

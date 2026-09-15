@@ -14,11 +14,10 @@ import {
   ChevronRight,
   UserMinus,
 } from 'lucide-react';
-import { AppState, PopcornBong, Person, Participant } from '../types';
+import { AppState, Person, Participant } from '../types';
 import { getUserToken, saveUserTokenForName } from '../lib/userProfile';
 import { calculatePlayerQueueStatus } from '../lib/tournament-notifications';
 import {
-  activatePopcornBong,
   registerParticipant,
   registerAlphaInterest,
   renameUser,
@@ -56,18 +55,6 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
     if (activePerson?.anonymousToken) return activePerson.anonymousToken;
     return getUserToken(currentUserName);
   }, [activePerson, currentUserName]);
-
-  // Find user's popcorn bong
-  const userBong = useMemo((): PopcornBong | null => {
-    if (!state.popcorn?.bongs) return null;
-    if (activePersonId) {
-      return state.popcorn.bongs.find((b) => b.personId === activePersonId) || null;
-    }
-    if (userToken) {
-      return state.popcorn.bongs.find((b) => b.clientToken === userToken) || null;
-    }
-    return null;
-  }, [state.popcorn, activePersonId, userToken]);
 
   // Find user's table tennis registration
   const participant = useMemo(() => {
@@ -110,24 +97,6 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
       matchesAhead: status.matchesAhead,
     };
   }, [participant, state.tournament, activePerson, currentUserName]);
-
-  // Actions
-  const handleClaimPopcorn = async () => {
-    setLoadingAction('popcorn');
-    setActionError(null);
-    try {
-      await activatePopcornBong(
-        userToken,
-        activePerson?.displayId || currentUserName || undefined,
-        activePersonId || undefined
-      );
-      onRefreshState();
-    } catch (err: any) {
-      setActionError(err.message || 'Kunne ikke aktivere popcornbong.');
-    } finally {
-      setLoadingAction(null);
-    }
-  };
 
   const handleRegisterTableTennis = async () => {
     if (!activePerson) {
@@ -445,78 +414,21 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
               </div>
             </div>
 
-            <div>
-              {userBong?.status === 'used' ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-300 font-bold text-xs uppercase tracking-wider border border-zinc-700">
-                  <CheckCircle2 className="w-4 h-4 text-lime-400" />
-                  Bong #{userBong.number} – Hentet ✓
-                </span>
-              ) : userBong?.status === 'activated' ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500 text-zinc-950 font-black text-xs uppercase tracking-wider shadow-artistic-sm animate-pulse">
-                  <Sparkles className="w-4 h-4" />
-                  Bong #{userBong.number} – Klar til henting
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-700">
-                  Ingen bong
-                </span>
-              )}
-            </div>
           </div>
 
-          <div className="mt-4">
-            {userBong ? (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
-                <div className="flex items-center gap-4">
-                  <div className="px-5 py-2.5 bg-amber-500 text-zinc-950 rounded-xl font-black text-2xl font-mono shadow-artistic-sm">
-                    #{userBong.number}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-white">
-                      {userBong.status === 'used' ? 'Popcorn hentet ut' : 'Klar for henting i kiosken'}
-                    </h4>
-                    <p className="text-xs text-zinc-400">
-                      {userBong.status === 'used'
-                        ? `Bong #${userBong.number} er allerede levert ut til deg.`
-                        : `Vis nummer #${userBong.number} til personalet i kiosken for å få ditt beger.`}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onGoToTab('kiosk')}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
-                >
-                  Vis i kiosken
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <p className="text-sm text-zinc-300 max-w-md">
-                  De første 100 som trykker får gratis nypoppet popcorn i kiosken. Bong tildeles i sekvensiell rekkefølge.
-                </p>
-                <button
-                  id="btn-profile-claim-popcorn"
-                  type="button"
-                  disabled={loadingAction === 'popcorn'}
-                  onClick={handleClaimPopcorn}
-                  className="px-5 py-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
-                >
-                  {loadingAction === 'popcorn' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Henter bong...
-                    </>
-                  ) : (
-                    <>
-                      <Popcorn className="w-4 h-4 text-zinc-950" />
-                      Ta mot popcorn
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+          <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p className="text-sm text-zinc-300 max-w-md">
+              Gratis popcorn – hent i kiosken når du kommer inn! De første 100 får nypoppet popcorn.
+            </p>
+            <button
+              id="btn-profile-go-kiosk"
+              type="button"
+              onClick={() => onGoToTab('kiosk')}
+              className="px-5 py-3 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Popcorn className="w-4 h-4 text-zinc-950" />
+              Gå til kiosken
+            </button>
           </div>
         </div>
 

@@ -73,7 +73,7 @@ Express (server.ts)
 | Bordtenniscup | Aktiv | `tournament.ts`, `TableTennisView`, `TableTennisAdminPanel` |
 | Aktiviteter / program | Aktiv | `ActivityGrid`, `initial-data.ts` |
 | UngdomsAlpha | Aktiv | `AlphaView` |
-| Kiosk / Vipps | Aktiv | `KioskSection`, `KioskAdminPanel` |
+| Kiosk / Vipps | Informativ meny (ingen handlekurv i appen) | `KioskSection`, `KioskAdminPanel` |
 | Popcorn-bong | Deaktivert for pilot | `PopcornBongCard`, `/api/popcorn/*` |
 | Storskjerm | Aktiv | `DisplayScreen` |
 | Web push | Aktiv | `webpush-client.ts`, `public/sw.js` |
