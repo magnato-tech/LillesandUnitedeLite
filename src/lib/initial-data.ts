@@ -164,6 +164,10 @@ export const INITIAL_STATE: AppState = {
     vippsName: 'Lillesand United Kiosk',
     vippsUrl: '',
   },
+  alphaSettings: {
+    spondUrl: '',
+    spondButtonLabel: 'Meld deg på via Spond',
+  },
   persons: [],
 };
 
@@ -181,6 +185,10 @@ export function createEmptyAppState(): AppState {
       vippsNumber: '12345',
       vippsName: 'Lillesand United Kiosk',
       vippsUrl: '',
+    },
+    alphaSettings: {
+      spondUrl: '',
+      spondButtonLabel: 'Meld deg på via Spond',
     },
     activities: JSON.parse(JSON.stringify(INITIAL_ACTIVITIES)),
     tournament: {

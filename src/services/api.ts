@@ -552,15 +552,30 @@ export async function registerAlphaInterest(
   firstName: string,
   phone?: string,
   notes?: string,
-  userId?: string
+  userId?: string,
+  personId?: string
 ): Promise<AppState> {
   const res = await fetch('/api/alpha/interest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ firstName, phone, notes, userId }),
+    body: JSON.stringify({ firstName, phone, notes, userId, personId }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Kunne ikke registrere Alpha-interesse');
+  return data.state;
+}
+
+export async function saveAlphaSettings(settings: {
+  spondUrl?: string;
+  spondButtonLabel?: string;
+}): Promise<AppState> {
+  const res = await fetch('/api/alpha/settings', {
+    method: 'POST',
+    headers: getAdminHeaders(),
+    body: JSON.stringify(settings),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Kunne ikke lagre Alpha-innstillinger');
   return data.state;
 }
 

@@ -563,6 +563,7 @@ export default function App() {
             <AlphaView
               myPlayerName={currentUserName}
               activePersonId={activePersonId}
+              alphaSettings={state.alphaSettings}
               onSuccessRegistered={() => {
                 loadLatestState();
               }}

@@ -60,6 +60,7 @@ import {
   resetPopcorn,
   updatePerson,
   resetAlpha,
+  saveAlphaSettings,
   resetTestData,
   resetAllData,
   setTournamentCapacity,
@@ -926,14 +927,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const [alphaSpondUrl, setAlphaSpondUrl] = useState(state.alphaSettings?.spondUrl || '');
+  const [alphaSpondButtonLabel, setAlphaSpondButtonLabel] = useState(
+    state.alphaSettings?.spondButtonLabel || 'Meld deg på via Spond'
+  );
+  const [savingAlphaSettings, setSavingAlphaSettings] = useState(false);
+
+  useEffect(() => {
+    setAlphaSpondUrl(state.alphaSettings?.spondUrl || '');
+    setAlphaSpondButtonLabel(state.alphaSettings?.spondButtonLabel || 'Meld deg på via Spond');
+  }, [state.alphaSettings]);
+
+  const handleSaveAlphaSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingAlphaSettings(true);
+      await saveAlphaSettings({
+        spondUrl: alphaSpondUrl.trim(),
+        spondButtonLabel: alphaSpondButtonLabel.trim(),
+      });
+      showToast('Alpha-innstillinger lagret!', 'success');
+      onRefresh();
+    } catch (err: any) {
+      showToast(err?.message || 'Kunne ikke lagre Alpha-innstillinger', 'error');
+    } finally {
+      setSavingAlphaSettings(false);
+    }
+  };
+
   // Copy Alpha list to clipboard
   const handleCopyAlphaList = () => {
     const text = alphaInterests
       .map(
         (a, i) =>
-          `${i + 1}. ${a.firstName} ${a.phone ? `(tlf: ${a.phone})` : ''} - registrert: ${new Date(
+          `${i + 1}. ${a.firstName}${a.personId ? ` (${a.personId})` : ''} — ${new Date(
             a.registeredAt
-          ).toLocaleTimeString('no-NO')}`
+          ).toLocaleString('no-NO')}`
       )
       .join('\n');
     navigator.clipboard.writeText(text);
@@ -1801,56 +1830,112 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ---------------- TAB: ALPHA INTERESTS ---------------- */}
       {adminTab === 'alpha' && (
-        <div className="p-6 rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-sm space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-6">
+          <form
+            onSubmit={handleSaveAlphaSettings}
+            className="p-6 rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-sm space-y-4"
+          >
             <div>
               <h3 className="text-base font-black text-white uppercase flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-sky-400" />
-                Interesserte i UngdomsAlpha ({alphaInterests.length})
+                Spond-innstillinger
               </h3>
-              <p className="text-xs text-zinc-400 font-medium">
-                Oppstart: Fredag 25. september kl. 19:00
+              <p className="text-xs text-zinc-400 font-medium mt-1">
+                Spond-lenken viser påmeldingsknapp på UngdomsAlpha-siden. Infotekst om Alpha Ung-bordet vises alltid, uansett om lenke er satt.
               </p>
             </div>
 
-            <button
-              onClick={handleCopyAlphaList}
-              disabled={alphaInterests.length === 0}
-              className="px-4 py-2.5 rounded-2xl bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-zinc-950 text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-artistic-sm active:translate-x-0.5 active:translate-y-0.5 transition-all"
-            >
-              <Copy className="w-4 h-4" />
-              Kopier liste
-            </button>
-          </div>
+            <div>
+              <label className="block text-xs font-black text-zinc-300 uppercase tracking-wider mb-1.5">
+                Spond påmeldingslenke
+              </label>
+              <input
+                type="url"
+                placeholder="https://spond.com/..."
+                value={alphaSpondUrl}
+                onChange={(e) => setAlphaSpondUrl(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl bg-zinc-950 border-2 border-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:border-sky-400 text-sm font-medium"
+              />
+            </div>
 
-          <div className="space-y-3">
-            {alphaInterests.map((item, idx) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-between text-xs shadow-artistic-sm"
+            <div>
+              <label className="block text-xs font-black text-zinc-300 uppercase tracking-wider mb-1.5">
+                Knappetekst (valgfritt)
+              </label>
+              <input
+                type="text"
+                placeholder="Meld deg på via Spond"
+                value={alphaSpondButtonLabel}
+                onChange={(e) => setAlphaSpondButtonLabel(e.target.value)}
+                className="w-full px-4 py-3 rounded-2xl bg-zinc-950 border-2 border-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:border-sky-400 text-sm font-medium"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={savingAlphaSettings}
+              className="px-5 py-3 rounded-2xl bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-zinc-950 text-xs font-black uppercase tracking-wider shadow-artistic-sm transition-all"
+            >
+              {savingAlphaSettings ? 'Lagrer...' : 'Lagre Spond-innstillinger'}
+            </button>
+          </form>
+
+          <div className="p-6 rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-sm space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-white uppercase flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-sky-400" />
+                  Interesserte i appen ({alphaInterests.length})
+                </h3>
+                <p className="text-xs text-zinc-400 font-medium mt-1">
+                  Alle som har trykket «Ja, jeg er interessert!» i appen. Sammenlign med Alpha-bord og Spond-eksport for full oversikt.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCopyAlphaList}
+                disabled={alphaInterests.length === 0}
+                className="px-4 py-2.5 rounded-2xl bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-zinc-950 text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-artistic-sm active:translate-x-0.5 active:translate-y-0.5 transition-all"
               >
-                <div>
-                  <strong className="text-white text-sm font-black block">
-                    {idx + 1}. {item.firstName}
-                  </strong>
-                  <span className="text-zinc-400 font-medium">
-                    {item.phone ? `Tlf: ${item.phone}` : 'Uten telefonnummer'}
+                <Copy className="w-4 h-4" />
+                Kopier liste
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {alphaInterests.map((item, idx) => (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-between text-xs shadow-artistic-sm gap-3"
+                >
+                  <div className="min-w-0">
+                    <strong className="text-white text-sm font-black block">
+                      {idx + 1}. {item.firstName}
+                    </strong>
+                    {item.personId && (
+                      <span className="text-zinc-500 font-mono text-[10px] block truncate">
+                        Profil: {item.personId}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-zinc-500 text-[11px] font-mono shrink-0 text-right">
+                    {new Date(item.registeredAt).toLocaleString('no-NO', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 </div>
-                <span className="text-zinc-500 text-[11px] font-mono">
-                  {new Date(item.registeredAt).toLocaleTimeString('no-NO', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-            ))}
+              ))}
 
-            {alphaInterests.length === 0 && (
-              <div className="p-8 text-center text-xs font-bold text-zinc-500">
-                Ingen har registrert interesse for UngdomsAlpha enda.
-              </div>
-            )}
+              {alphaInterests.length === 0 && (
+                <div className="p-8 text-center text-xs font-bold text-zinc-500">
+                  Ingen har registrert interesse for UngdomsAlpha enda.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

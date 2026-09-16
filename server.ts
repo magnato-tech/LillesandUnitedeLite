@@ -222,6 +222,10 @@ function loadState(): AppState {
           vippsName: 'Lillesand United Kiosk',
           vippsUrl: '',
         },
+        alphaSettings: parsed.alphaSettings || INITIAL_STATE.alphaSettings || {
+          spondUrl: '',
+          spondButtonLabel: 'Meld deg på via Spond',
+        },
         activities: mergeActivitiesFromDisk(parsed.activities, INITIAL_ACTIVITIES),
         persons,
       };
@@ -1347,6 +1351,29 @@ app.get('/api/user/status', (req, res) => {
       },
     },
   });
+});
+
+// Save Alpha settings (Spond link etc.) (Admin)
+app.post('/api/alpha/settings', requireAdmin, (req, res) => {
+  const { spondUrl, spondButtonLabel } = req.body;
+
+  const cleanUrl = typeof spondUrl === 'string' ? spondUrl.trim() : (state.alphaSettings?.spondUrl || '');
+  if (cleanUrl && !/^https?:\/\//i.test(cleanUrl)) {
+    return res.status(400).json({ error: 'Spond-lenken må starte med http:// eller https://' });
+  }
+
+  state.alphaSettings = {
+    spondUrl: cleanUrl,
+    spondButtonLabel:
+      typeof spondButtonLabel === 'string' && spondButtonLabel.trim()
+        ? spondButtonLabel.trim()
+        : (state.alphaSettings?.spondButtonLabel || 'Meld deg på via Spond'),
+  };
+
+  state.updatedAt = new Date().toISOString();
+  saveState();
+
+  res.json({ success: true, settings: state.alphaSettings, state });
 });
 
 // Reset Alpha interests (Admin + reset PIN)

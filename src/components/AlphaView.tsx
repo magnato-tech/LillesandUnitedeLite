@@ -1,23 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Calendar, Clock, MapPin, Heart, CheckCircle2, Send, MessageCircle, Utensils, ShieldCheck, Bell } from 'lucide-react';
+import {
+  Sparkles,
+  Calendar,
+  Clock,
+  MapPin,
+  Heart,
+  CheckCircle2,
+  Send,
+  MessageCircle,
+  Utensils,
+  Bell,
+  ExternalLink,
+  Info,
+} from 'lucide-react';
 import { registerAlphaInterest } from '../services/api';
 import { getUserToken } from '../lib/userProfile';
 import { checkPushSupport, subscribeToWebPush, PushSupportStatus } from '../lib/webpush-client';
+import { AlphaSettings } from '../types';
 
 interface AlphaViewProps {
   myPlayerName?: string | null;
   activePersonId?: string | null;
+  alphaSettings?: AlphaSettings;
   onSuccessRegistered?: () => void;
 }
 
-export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePersonId, onSuccessRegistered }) => {
+const BOOTH_INFO_TEXT =
+  'Ta kontakt med oss ved Alpha Ung-bordet, så får du mer informasjon om Alpha Ung.';
+
+export const AlphaView: React.FC<AlphaViewProps> = ({
+  myPlayerName,
+  activePersonId,
+  alphaSettings,
+  onSuccessRegistered,
+}) => {
   const [name, setName] = useState(myPlayerName || '');
-  const [phone, setPhone] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enablePush, setEnablePush] = useState(true);
   const [pushStatus, setPushStatus] = useState<PushSupportStatus>(() => checkPushSupport());
+
+  const spondUrl = alphaSettings?.spondUrl?.trim() || '';
+  const spondButtonLabel = alphaSettings?.spondButtonLabel?.trim() || 'Meld deg på via Spond';
 
   useEffect(() => {
     setPushStatus(checkPushSupport());
@@ -37,9 +62,14 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
     setError(null);
     try {
       const userToken = getUserToken();
-      await registerAlphaInterest(name.trim(), phone.trim() || undefined, undefined, userToken);
+      await registerAlphaInterest(
+        name.trim(),
+        undefined,
+        undefined,
+        userToken,
+        activePersonId || undefined
+      );
 
-      // If push is chosen and activePersonId exists, register Web Push for Alpha
       if (enablePush && activePersonId && pushStatus.supported) {
         try {
           await subscribeToWebPush(activePersonId, 'alphaCourse', 'alpha-2026');
@@ -59,9 +89,7 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8">
-      {/* Hero Banner with Youth Alpha Theme */}
       <div className="relative rounded-3xl overflow-hidden bg-zinc-900 p-6 sm:p-10 border-2 border-sky-400 shadow-artistic-md mb-8">
-        {/* Decorative graphic doodles overlay */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-sky-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -83,7 +111,6 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
             Spis gratis digg mat, se morsomme videoer med vertene Xenia og gjengen, og diskuter hva DU tenker om de store spørsmålene i hverdagen.
           </p>
 
-          {/* Quick Date Badge */}
           <div className="inline-flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-zinc-950 border-2 border-zinc-800 shadow-artistic-sm text-white">
             <div className="flex items-center gap-2 text-sm font-black text-sky-400 uppercase tracking-wide">
               <Calendar className="w-4 h-4 text-sky-400" />
@@ -115,7 +142,6 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
         </div>
       </div>
 
-      {/* Registration / Interest Form placed directly under YouTube video and right above "Gratis digg mat" */}
       <div className="rounded-3xl p-6 sm:p-8 bg-zinc-900 border-2 border-zinc-800 shadow-artistic-md mb-8">
         {submitted ? (
           <div className="text-center py-6">
@@ -123,12 +149,13 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <h3 className="text-3xl font-black text-white uppercase tracking-tight mb-2">
-              Takk for interessen! 🎉
+              Takk for interessen!
             </h3>
             <p className="text-zinc-300 text-sm max-w-md mx-auto mb-6 font-medium">
-              Vi har registrert fornavnet ditt. Du vil få en hyggelig påminnelse før oppstarten fredag 25. september kl. 19:00.
+              Vi har registrert fornavnet ditt. {BOOTH_INFO_TEXT}
             </p>
             <button
+              type="button"
               onClick={() => setSubmitted(false)}
               className="text-xs font-black uppercase tracking-wider text-lime-400 hover:underline"
             >
@@ -136,17 +163,39 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
             </button>
           </div>
         ) : (
-          <div className="max-w-xl mx-auto">
-            <div className="text-center mb-6">
+          <div className="max-w-xl mx-auto space-y-5">
+            <div className="text-center">
               <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight mb-2">
                 Vis interesse for UngdomsAlpha
               </h2>
               <p className="text-xs sm:text-sm text-zinc-400 font-medium">
-                Uforpliktende interessepåmelding. Kun fornavn er påkrevd. Du bestemmer selv om du vil legge til telefonnummer for SMS-påminnelse.
+                Uforpliktende interessepåmelding. Kun fornavn er påkrevd.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="p-4 rounded-2xl bg-sky-400/10 border-2 border-sky-400/40 flex items-start gap-3">
+              <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-zinc-200 font-medium leading-relaxed">{BOOTH_INFO_TEXT}</p>
+            </div>
+
+            {spondUrl && (
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-400 font-medium text-center">
+                  Meld deg på via Spond for å få varsler om Alpha-samlinger.
+                </p>
+                <a
+                  href={spondUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-4 px-6 rounded-2xl bg-sky-400 hover:bg-sky-300 text-zinc-950 font-black text-sm uppercase tracking-wider shadow-artistic-sm flex items-center justify-center gap-2 transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  {spondButtonLabel}
+                </a>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4 pt-2 border-t border-zinc-800">
               <div>
                 <label className="block text-xs font-black text-zinc-300 uppercase tracking-wider mb-1.5">
                   Ditt fornavn <span className="text-rose-400">*</span>
@@ -157,20 +206,6 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full px-4 py-3.5 rounded-2xl bg-zinc-950 border-2 border-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:border-sky-400 text-sm font-bold shadow-artistic-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-zinc-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Mobilnummer for SMS-påminnelse</span>
-                  <span className="text-zinc-500 text-[10px] lowercase font-normal">(valgfritt)</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder="8 siffer (valgfritt)"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-4 py-3.5 rounded-2xl bg-zinc-950 border-2 border-zinc-800 text-white placeholder-zinc-500 focus:outline-none focus:border-sky-400 text-sm font-bold shadow-artistic-sm"
                 />
               </div>
@@ -189,17 +224,21 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
                       <span>Motta påminnelser via pushvarsel på mobil</span>
                     </div>
                     <div className="text-zinc-400 text-[11px] font-medium">
-                      Erstatter/supplerer SMS direkte på mobilen, også ved låst skjerm.
+                      Valgfritt — også ved låst skjerm.
                     </div>
                   </div>
                 </label>
               )}
 
-              <div className="pt-2">
+              <p className="text-xs text-zinc-500 font-medium text-center">
+                Legg inn fornavn her så vi vet at du er interessert — også om du ikke melder deg på via Spond.
+              </p>
+
+              <div className="pt-1">
                 <button
                   type="submit"
                   disabled={loading || !name.trim()}
-                  className="w-full py-4 px-6 rounded-2xl bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-zinc-950 font-black text-sm uppercase tracking-wider shadow-artistic-sm flex items-center justify-center gap-2 active:translate-x-0.5 active:translate-y-0.5 transition-all"
+                  className="w-full py-4 px-6 rounded-2xl bg-zinc-950 border-2 border-sky-400 hover:bg-sky-400/10 disabled:opacity-50 text-sky-400 font-black text-sm uppercase tracking-wider shadow-artistic-sm flex items-center justify-center gap-2 transition-all"
                 >
                   <Send className="w-4 h-4" />
                   {loading ? 'Sender inn...' : 'Ja, jeg er interessert!'}
@@ -207,23 +246,13 @@ export const AlphaView: React.FC<AlphaViewProps> = ({ myPlayerName, activePerson
               </div>
 
               {error && (
-                <p className="text-xs text-rose-400 text-center font-bold mt-2">
-                  {error}
-                </p>
+                <p className="text-xs text-rose-400 text-center font-bold">{error}</p>
               )}
-
-              <div className="text-[11px] text-zinc-500 text-center flex items-start sm:items-center justify-center gap-1.5 font-medium leading-relaxed">
-                <ShieldCheck className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5 sm:mt-0" />
-                <span>
-                  Personvern: Mobilnummeret brukes kun til SMS-påminnelser om Alpha-kurset og slettes etter kurset. Du kan når som helst be oss om å stoppe SMS-varslene.
-                </span>
-              </div>
             </form>
           </div>
         )}
       </div>
 
-      {/* 3 Pillars of Alpha Youth */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
         <div className="p-6 rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-sm hover:border-zinc-700 transition-colors">
           <div className="w-14 h-14 rounded-2xl bg-zinc-950 border-2 border-zinc-800 text-orange-400 flex items-center justify-center mb-4 shadow-artistic-sm -rotate-2">

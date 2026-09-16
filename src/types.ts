@@ -163,6 +163,11 @@ export interface KioskSettings {
   vippsUrl?: string; // Optional official Vipps deep link / QR link (e.g. https://qr.vipps.no/28/...)
 }
 
+export interface AlphaSettings {
+  spondUrl?: string;
+  spondButtonLabel?: string;
+}
+
 export interface PushSubscriptionTopic {
   active: boolean;
   expiresAt?: string | null;
@@ -200,6 +205,7 @@ export interface AppState {
   popcorn: PopcornData;
   kioskItems?: KioskItem[];
   kioskSettings?: KioskSettings;
+  alphaSettings?: AlphaSettings;
   activities: Activity[];
   tournament: Tournament;
   alphaInterests: AlphaInterest[];

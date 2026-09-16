@@ -150,7 +150,13 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
     setLoadingAction('alpha');
     setActionError(null);
     try {
-      await registerAlphaInterest(currentUserName, undefined, undefined, userToken);
+      await registerAlphaInterest(
+        currentUserName,
+        undefined,
+        undefined,
+        userToken,
+        activePersonId || undefined
+      );
       onRefreshState();
     } catch (err: any) {
       setActionError(err.message || 'Kunne ikke melde interesse for Alpha.');
