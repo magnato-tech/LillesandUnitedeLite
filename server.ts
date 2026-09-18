@@ -706,6 +706,9 @@ app.post('/api/persons/:id/generate-code', requireAdmin, (req, res) => {
     usedAt: null,
   });
 
+  // Also immediately clear any rate-limit locks so user can enter the new PIN right away
+  claimCodeAttempts.clear();
+
   saveState();
 
   res.json({
@@ -716,7 +719,7 @@ app.post('/api/persons/:id/generate-code', requireAdmin, (req, res) => {
 });
 
 // Rate limiting map for code claiming (brute force protection)
-const claimCodeAttempts = new Map<string, { count: number; lockedUntil: number }>();
+const claimCodeAttempts = new Map<string, { count: number; lockedUntil: number; windowStart: number }>();
 
 // Claim one-time PIN code to link device to existing person profile
 app.post('/api/persons/claim-code', (req, res) => {
@@ -727,6 +730,7 @@ app.post('/api/persons/claim-code', (req, res) => {
     const waitSec = Math.ceil((attempt.lockedUntil - now) / 1000);
     return res.status(429).json({
       error: `For mange forsøk. Vennligst vent ${waitSec} sekunder før du prøver igjen.`,
+      retryAfter: waitSec,
     });
   }
 
@@ -752,11 +756,24 @@ app.post('/api/persons/claim-code', (req, res) => {
   );
 
   if (!record) {
-    const curr = claimCodeAttempts.get(ip) || { count: 0, lockedUntil: 0 };
-    curr.count += 1;
-    if (curr.count >= 5) {
-      curr.lockedUntil = now + 60 * 1000;
+    const curr = claimCodeAttempts.get(ip) || { count: 0, lockedUntil: 0, windowStart: now };
+    // Reset window after 2 minutes
+    if (now - curr.windowStart > 120 * 1000) {
       curr.count = 0;
+      curr.windowStart = now;
+      curr.lockedUntil = 0;
+    }
+    curr.count += 1;
+    // Allow 8 attempts within 2 minutes; trigger gentle 15s cooldown if exceeded
+    if (curr.count >= 8) {
+      curr.lockedUntil = now + 15 * 1000;
+      curr.count = 0;
+      curr.windowStart = now;
+      claimCodeAttempts.set(ip, curr);
+      return res.status(429).json({
+        error: 'For mange forsøk. Vennligst vent 15 sekunder før du prøver igjen.',
+        retryAfter: 15,
+      });
     }
     claimCodeAttempts.set(ip, curr);
     return res.status(400).json({

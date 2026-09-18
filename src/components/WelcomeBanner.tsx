@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight, KeyRound, X, Loader2 } from 'lucide-react';
 import { Person } from '../types';
 import { claimPersonAccessCode } from '../services/api';
@@ -17,6 +17,21 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [pinLoading, setPinLoading] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          setPinError(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownSeconds]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +41,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
 
   const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldownSeconds > 0) return;
     const clean = pinInput.replace(/\s+/g, '').trim();
     if (!clean) return;
 
@@ -35,10 +51,19 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
     try {
       const res = await claimPersonAccessCode(clean);
       setShowPinModal(false);
+      setCooldownSeconds(0);
       if (onClaimPerson) {
         onClaimPerson(res.person);
       }
     } catch (err: any) {
+      if (err.retryAfter && typeof err.retryAfter === 'number') {
+        setCooldownSeconds(err.retryAfter);
+      } else if (typeof err.message === 'string') {
+        const match = err.message.match(/(\d+)\s*sekunder/i);
+        if (match && match[1]) {
+          setCooldownSeconds(parseInt(match[1], 10));
+        }
+      }
       setPinError(err.message || 'Ugyldig eller utløpt PIN-kode. Sjekk koden eller be arrangør om en ny.');
     } finally {
       setPinLoading(false);
@@ -148,16 +173,31 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                   maxLength={8}
                   placeholder="6 siffer (f.eks. 582914)"
                   value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
+                  onChange={(e) => {
+                    setPinInput(e.target.value);
+                    if (cooldownSeconds === 0 && pinError) {
+                      setPinError(null);
+                    }
+                  }}
                   className="w-full px-4 py-3.5 rounded-2xl bg-zinc-900 border-2 border-zinc-800 focus:border-lime-400 text-white text-center text-xl font-mono font-black tracking-widest focus:outline-none shadow-artistic-sm"
                 />
               </div>
 
-              {pinError && (
+              {cooldownSeconds > 0 ? (
+                <div className="p-3.5 rounded-xl bg-amber-950/50 border border-amber-500/40 text-xs text-amber-200 font-bold flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span>For mange forsøk. Vent litt:</span>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs font-black">
+                    {cooldownSeconds} sekunder
+                  </span>
+                </div>
+              ) : pinError ? (
                 <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/50 text-xs text-rose-400 font-bold">
                   {pinError}
                 </div>
-              )}
+              ) : null}
 
               <div className="flex items-center gap-3 pt-2">
                 <button
@@ -169,7 +209,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={pinLoading || !pinInput.trim()}
+                  disabled={pinLoading || !pinInput.trim() || cooldownSeconds > 0}
                   className="flex-1 py-3 px-4 rounded-xl bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-zinc-950 font-black text-xs uppercase tracking-wider shadow-artistic-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {pinLoading ? (
@@ -177,6 +217,8 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>Kobler til...</span>
                     </>
+                  ) : cooldownSeconds > 0 ? (
+                    <span>Vent ({cooldownSeconds}s)</span>
                   ) : (
                     <span>Koble til profil</span>
                   )}

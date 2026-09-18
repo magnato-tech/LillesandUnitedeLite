@@ -180,7 +180,12 @@ export async function claimPersonAccessCode(code: string): Promise<{ person: Per
     body: JSON.stringify({ code }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Ugyldig eller utløpt PIN-kode');
+  if (!res.ok) {
+    const err: any = new Error(data.error || 'Ugyldig eller utløpt PIN-kode');
+    err.retryAfter = data.retryAfter;
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
