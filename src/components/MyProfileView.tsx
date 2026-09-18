@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   User,
   UserCheck,
-  RotateCcw,
   Trophy,
   Popcorn,
   Sparkles,
@@ -10,18 +9,16 @@ import {
   AlertCircle,
   Loader2,
   Clock,
-  Edit2,
   ChevronRight,
   UserMinus,
   Gamepad2,
 } from 'lucide-react';
 import { AppState, Person, Participant } from '../types';
-import { getUserToken, saveUserTokenForName } from '../lib/userProfile';
+import { getUserToken } from '../lib/userProfile';
 import { calculatePlayerQueueStatus } from '../lib/tournament-notifications';
 import {
   registerParticipant,
   registerAlphaInterest,
-  renameUser,
   withdrawTournamentParticipant,
   registerMarioKart,
   withdrawMarioKart,
@@ -46,8 +43,6 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
   activePersonId = null,
   activePerson: activePersonProp = null,
 }) => {
-  const [editingName, setEditingName] = useState(false);
-  const [newNameInput, setNewNameInput] = useState('');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -135,7 +130,6 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
   const handleRegisterTableTennis = async () => {
     if (!activePerson) {
       setActionError('Du må velge eller opprette en profil før du melder deg på bordtennis.');
-      setEditingName(true);
       return;
     }
     setLoadingAction('tabletennis');
@@ -178,7 +172,7 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
 
   const handleRegisterAlpha = async () => {
     if (!currentUserName) {
-      setEditingName(true);
+      setActionError('Du må ha en profil før du melder interesse for Alpha.');
       return;
     }
     setLoadingAction('alpha');
@@ -201,7 +195,7 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
 
   const handleRegisterMarioKart = async () => {
     if (!activePerson && !currentUserName) {
-      setEditingName(true);
+      setActionError('Du må ha en profil før du melder deg på Mario Kart.');
       return;
     }
     setLoadingAction('mariokart');
@@ -242,31 +236,6 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
     }
   };
 
-  const handleRename = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNameInput.trim()) return;
-    const cleanNew = newNameInput.trim();
-    setLoadingAction('rename');
-    setActionError(null);
-    try {
-      await renameUser(userToken, cleanNew, currentUserName || undefined);
-      saveUserTokenForName(cleanNew, userToken);
-      onSetMyPlayer(cleanNew);
-      setEditingName(false);
-      setNewNameInput('');
-      onRefreshState();
-    } catch (err: any) {
-      setActionError(err.message || 'Kunne ikke endre navn.');
-    } finally {
-      setLoadingAction(null);
-    }
-  };
-
-  const handleLogout = () => {
-    onSetMyPlayer(null);
-    onRefreshState();
-  };
-
   return (
     <div id="my-profile-view" className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8">
       {/* Top Profile Header Card */}
@@ -293,77 +262,7 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap">
-            {currentUserName && (
-              <button
-                id="btn-rename-user"
-                type="button"
-                onClick={() => {
-                  setNewNameInput(currentUserName || '');
-                  setEditingName(true);
-                }}
-                className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-artistic-sm"
-                title="Endre fornavn på samme profil"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-lime-400" />
-                <span>Bytt navn</span>
-              </button>
-            )}
-
-            {currentUserName && (
-              <button
-                id="btn-logout-user"
-                type="button"
-                onClick={handleLogout}
-                className="px-3 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-rose-300 hover:text-rose-200 border border-zinc-800 hover:border-rose-800/60 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-artistic-sm"
-                title="Logger ut denne enheten og lar en annen deltaker registrere seg"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
-                <span>Logg ut / Bytt bruker</span>
-              </button>
-            )}
-          </div>
         </div>
-
-        {/* Rename Input Form */}
-        {editingName && (
-          <form
-            onSubmit={handleRename}
-            className="mt-5 p-4 bg-zinc-950 rounded-2xl border-2 border-lime-400/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
-          >
-            <div className="flex-1">
-              <label className="block text-[11px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                Skriv inn nytt fornavn (beholder samme bruker-ID, popcornbong og aktiviteter):
-              </label>
-              <input
-                type="text"
-                value={newNameInput}
-                onChange={(e) => setNewNameInput(e.target.value)}
-                placeholder="Fornavn"
-                autoFocus
-                required
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2 text-sm text-white font-bold focus:outline-none focus:border-lime-400"
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-2 sm:pt-4">
-              <button
-                type="submit"
-                disabled={loadingAction === 'rename' || !newNameInput.trim()}
-                className="px-4 py-2 bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm disabled:opacity-50"
-              >
-                {loadingAction === 'rename' ? 'Oppdaterer...' : 'Lagre navn'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingName(false)}
-                className="px-3 py-2 text-zinc-400 hover:text-white text-xs font-bold"
-              >
-                Avbryt
-              </button>
-            </div>
-          </form>
-        )}
       </div>
 
       {actionError && (

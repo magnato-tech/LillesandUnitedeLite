@@ -367,14 +367,6 @@ export const TableTennisView: React.FC<TableTennisViewProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Change player switcher */}
-            <button
-              onClick={() => onSetMyPlayer(null)}
-              className="text-xs font-black uppercase tracking-wider underline self-end sm:self-center shrink-0 opacity-80 hover:opacity-100"
-            >
-              Bytt spiller
-            </button>
           </div>
         </div>
       )}

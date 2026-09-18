@@ -99,12 +99,6 @@ export default function App() {
       );
       if (match) return match;
     }
-    if (activeSession.firstName) {
-      const match = persons.find(
-        (p) => p.firstName?.toLowerCase() === activeSession.firstName?.toLowerCase()
-      );
-      if (match) return match;
-    }
     return null;
   }, [activeSession, state.persons]);
 
@@ -115,7 +109,7 @@ export default function App() {
   // - Otherwise -> false
   const hasActiveUser = Boolean(
     effectiveActivePerson ||
-    (!isStateLoaded && (activeSession.personId || activeSession.displayId || activeSession.firstName))
+    (!isStateLoaded && (activeSession.personId || activeSession.displayId))
   );
 
   const activePersonId = effectiveActivePerson?.id || activeSession.personId;
@@ -248,17 +242,13 @@ export default function App() {
 
       // Verify and sync active session against the latest persons in database
       const session = getActiveSession();
-      if (session.personId || session.displayId || session.firstName) {
+      if (session.personId || session.displayId) {
         const persons = data.persons || [];
         const match =
           (session.personId && persons.find((p) => p.id === session.personId)) ||
           (session.displayId &&
             persons.find(
               (p) => p.displayId?.toLowerCase() === session.displayId?.toLowerCase()
-            )) ||
-          (session.firstName &&
-            persons.find(
-              (p) => p.firstName?.toLowerCase() === session.firstName?.toLowerCase()
             )) ||
           null;
 
@@ -404,24 +394,18 @@ export default function App() {
       handleSelectPerson(null);
       return;
     }
-    const clean = name.trim();
-    const matches = (state.persons || []).filter(
-      (p) => p.firstName.toLowerCase() === clean.toLowerCase()
-    );
-    if (matches.length === 1) {
-      handleSelectPerson(matches[0]);
-      return;
-    }
-    await handleCreatePerson(clean);
+    await handleCreatePerson(name.trim());
   };
 
   const handleRegisterPlayer = async (name: string, personId?: string) => {
-    let person =
-      personId && effectiveActivePerson?.id === personId
-        ? effectiveActivePerson
-        : (state.persons || []).find((p) =>
-            personId ? p.id === personId : p.firstName?.toLowerCase() === name.trim().toLowerCase()
-          );
+    let person: Person | null | undefined = effectiveActivePerson;
+
+    if (personId) {
+      person =
+        effectiveActivePerson?.id === personId
+          ? effectiveActivePerson
+          : (state.persons || []).find((p) => p.id === personId) || null;
+    }
 
     if (!person) {
       const { person: newPerson, state: newState } = await createPerson(name.trim());
@@ -519,7 +503,10 @@ export default function App() {
               {!hasActiveUser && (
                 <WelcomeBanner
                   onSetMyPlayer={handleSetMyPlayer}
-                  onClaimPerson={(person) => handleSelectPerson(person)}
+                  onClaimPerson={(person, newState) => {
+                    if (newState) setState(newState);
+                    handleSelectPerson(person);
+                  }}
                 />
               )}
               <EventHero

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight, KeyRound, X, Loader2 } from 'lucide-react';
-import { Person } from '../types';
+import { AppState, Person } from '../types';
 import { claimPersonAccessCode } from '../services/api';
 
 interface WelcomeBannerProps {
   onSetMyPlayer: (name: string) => void;
-  onClaimPerson?: (person: Person) => void;
+  onClaimPerson?: (person: Person, state: AppState) => void;
 }
 
 export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
@@ -53,7 +53,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
       setShowPinModal(false);
       setCooldownSeconds(0);
       if (onClaimPerson) {
-        onClaimPerson(res.person);
+        onClaimPerson(res.person, res.state);
       }
     } catch (err: any) {
       if (err.retryAfter && typeof err.retryAfter === 'number') {
