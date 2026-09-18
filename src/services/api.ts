@@ -1,4 +1,4 @@
-import { AppState, Participant, Match, AlphaInterest, PopcornBong, Person, TournamentFormatSettings } from '../types';
+import { AppState, Participant, Match, AlphaInterest, PopcornBong, Person, TournamentFormatSettings, MarioKartParticipant } from '../types';
 
 const STATE_CACHE_KEY = 'lillesand_state_cache';
 
@@ -161,6 +161,27 @@ export async function deletePerson(id: string): Promise<AppState> {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Kunne ikke slette person');
   return data.state;
+}
+
+export async function generatePersonAccessCode(personId: string): Promise<{ code: string; expiresAt: string }> {
+  const res = await fetch(`/api/persons/${personId}/generate-code`, {
+    method: 'POST',
+    headers: getAdminHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Kunne ikke generere PIN-kode');
+  return data;
+}
+
+export async function claimPersonAccessCode(code: string): Promise<{ person: Person; state: AppState }> {
+  const res = await fetch('/api/persons/claim-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Ugyldig eller utløpt PIN-kode');
+  return data;
 }
 
 export async function withdrawTournamentParticipant(options: {
@@ -704,4 +725,51 @@ export async function syncFirestore(): Promise<{
   if (!res.ok) throw new Error(data.error || 'Feil ved synkronisering til Firestore');
   return data;
 }
+
+// ----------------------------------------------------
+// MARIO KART & GAMING LOUNGE API
+// ----------------------------------------------------
+
+export async function registerMarioKart(params: {
+  personId?: string;
+  firstName?: string;
+  anonymousToken?: string;
+  userId?: string;
+}): Promise<{
+  success: boolean;
+  participant: MarioKartParticipant;
+  state: AppState;
+  alreadyRegistered?: boolean;
+}> {
+  const res = await fetch('/api/mariokart/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAdminHeaders(),
+    },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Kunne ikke melde på Mario Kart');
+  return data;
+}
+
+export async function withdrawMarioKart(params: {
+  participantId?: string;
+  personId?: string;
+  anonymousToken?: string;
+}): Promise<{ success: boolean; state: AppState }> {
+  const res = await fetch('/api/mariokart/withdraw', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAdminHeaders(),
+    },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Kunne ikke melde av Mario Kart');
+  return data;
+}
+
 

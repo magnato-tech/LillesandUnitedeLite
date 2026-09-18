@@ -13,6 +13,7 @@ import {
   Edit2,
   ChevronRight,
   UserMinus,
+  Gamepad2,
 } from 'lucide-react';
 import { AppState, Person, Participant } from '../types';
 import { getUserToken, saveUserTokenForName } from '../lib/userProfile';
@@ -22,6 +23,8 @@ import {
   registerAlphaInterest,
   renameUser,
   withdrawTournamentParticipant,
+  registerMarioKart,
+  withdrawMarioKart,
 } from '../services/api';
 
 interface MyProfileViewProps {
@@ -29,7 +32,7 @@ interface MyProfileViewProps {
   myPlayerName: string | null;
   onSetMyPlayer: (name: string | null) => void;
   onRefreshState: () => void;
-  onGoToTab: (tab: 'home' | 'tabletennis' | 'alpha' | 'kiosk') => void;
+  onGoToTab: (tab: 'home' | 'tabletennis' | 'alpha' | 'kiosk' | 'mariokart') => void;
   activePersonId?: string | null;
   activePerson?: Person | null;
 }
@@ -79,6 +82,37 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
         a.firstName.toLowerCase() === currentUserName.toLowerCase()
     ) || null;
   }, [state.alphaInterests, currentUserName, userToken]);
+
+  // Find user's Mario Kart registration
+  const marioKartRegistration = useMemo(() => {
+    const list = state.marioKartParticipants || [];
+    if (!list.length) return null;
+    const targetId = activePersonId || activePerson?.id;
+    if (targetId) {
+      const match = list.find((p) => p.personId === targetId || p.id === targetId);
+      if (match) return match;
+    }
+    if (activePerson?.displayId) {
+      const dId = activePerson.displayId.trim().toLowerCase();
+      const match = list.find((p) => p.displayId?.trim().toLowerCase() === dId);
+      if (match) return match;
+    }
+    if (activePerson?.firstName) {
+      const fName = activePerson.firstName.trim().toLowerCase();
+      const match = list.find((p) => p.firstName.trim().toLowerCase() === fName);
+      if (match) return match;
+    }
+    if (currentUserName) {
+      const cName = currentUserName.trim().toLowerCase();
+      const match = list.find(
+        (p) =>
+          p.firstName.trim().toLowerCase() === cName ||
+          p.displayId?.trim().toLowerCase() === cName
+      );
+      if (match) return match;
+    }
+    return null;
+  }, [state.marioKartParticipants, activePersonId, activePerson, currentUserName]);
 
   // Table tennis match / turn details
   const tableTennisStatus = useMemo(() => {
@@ -160,6 +194,49 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
       onRefreshState();
     } catch (err: any) {
       setActionError(err.message || 'Kunne ikke melde interesse for Alpha.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleRegisterMarioKart = async () => {
+    if (!activePerson && !currentUserName) {
+      setEditingName(true);
+      return;
+    }
+    setLoadingAction('mariokart');
+    setActionError(null);
+    try {
+      await registerMarioKart({
+        personId: activePerson?.id || activePersonId || undefined,
+        firstName: activePerson?.firstName || currentUserName || undefined,
+        anonymousToken: activePerson?.anonymousToken || userToken || undefined,
+        userId: userToken || undefined,
+      });
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke melde på Mario Kart.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleWithdrawMarioKart = async () => {
+    if (!marioKartRegistration) return;
+    if (!window.confirm('Vil du melde deg av Mario Kart?')) {
+      return;
+    }
+    setLoadingAction('mariokart');
+    setActionError(null);
+    try {
+      await withdrawMarioKart({
+        participantId: marioKartRegistration.id,
+        personId: activePersonId || activePerson?.id || undefined,
+        anonymousToken: activePerson?.anonymousToken || userToken || undefined,
+      });
+      onRefreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Kunne ikke melde av Mario Kart.');
     } finally {
       setLoadingAction(null);
     }
@@ -400,7 +477,109 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
           </div>
         </div>
 
-        {/* 2. POPCORN DIGITAL BONG */}
+        {/* 2. MARIO KART & GAMING LOUNGE */}
+        <div
+          id="profile-mariokart-card"
+          className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-artistic-md relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-500 flex items-center justify-center font-black">
+                <Gamepad2 className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-red-400 block">
+                  Gaming
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                  🎮 Mario Kart & Gaming Lounge
+                </h3>
+              </div>
+            </div>
+
+            <div>
+              {marioKartRegistration ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500 text-white font-black text-xs uppercase tracking-wider shadow-artistic-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  PÅMELDT
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 text-zinc-400 font-bold text-xs uppercase tracking-wider border border-zinc-700">
+                  Ikke påmeldt
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {marioKartRegistration ? (
+              <div className="space-y-3">
+                <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+                  <div className="text-xs text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                    Påmeldingsstatus
+                  </div>
+                  <div className="text-lg font-black text-white">
+                    Påmeldt som {marioKartRegistration.displayId || marioKartRegistration.firstName}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Gaming starter kl. 18:45 i gaming-hjørnet. Møt opp i god tid!
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onGoToTab('mariokart')}
+                    className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <span>Åpne Mario Kart-side</span>
+                    <ChevronRight className="w-4 h-4 text-red-400" />
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loadingAction === 'mariokart'}
+                    onClick={handleWithdrawMarioKart}
+                    className="px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Meld meg av Mario Kart"
+                  >
+                    <UserMinus className="w-4 h-4 text-rose-400" />
+                    <span>Meld meg av</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-sm text-zinc-300 max-w-md">
+                  Gaming på storskjerm og konsollstasjoner i Møglestuhallen. Bli med på moroa og konkurransene!
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    id="btn-profile-register-mariokart"
+                    type="button"
+                    disabled={loadingAction === 'mariokart'}
+                    onClick={handleRegisterMarioKart}
+                    className="px-5 py-3 bg-red-500 hover:bg-red-400 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-artistic-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    {loadingAction === 'mariokart' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Melder på...
+                      </>
+                    ) : (
+                      <>
+                        <Gamepad2 className="w-4 h-4 text-white" />
+                        MELD MEG PÅ
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. POPCORN DIGITAL BONG */}
         <div
           id="profile-popcorn-card"
           className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 sm:p-7 shadow-artistic-md relative overflow-hidden"

@@ -34,6 +34,9 @@ import {
   Sliders,
   Minus,
   ShoppingBag,
+  Gamepad2,
+  KeyRound,
+  MessageSquare,
 } from 'lucide-react';
 import { AppState, Match, PopcornBong, Person, Tournament, KioskItem } from '../types';
 import {
@@ -67,6 +70,9 @@ import {
   expandTournamentCapacity,
   getFirestoreStatus,
   syncFirestore,
+  registerMarioKart,
+  withdrawMarioKart,
+  generatePersonAccessCode,
 } from '../services/api';
 import {
   calculateTournamentStats,
@@ -114,6 +120,7 @@ interface AdminDashboardProps {
     | 'matches'
     | 'event_participants'
     | 'tabletennis_participants'
+    | 'mariokart'
     | 'activities'
     | 'alpha'
     | 'test';
@@ -172,13 +179,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Manual participant add state
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newEventPersonName, setNewEventPersonName] = useState('');
+  const [newMarioKartName, setNewMarioKartName] = useState('');
+  const [marioKartLoading, setMarioKartLoading] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
   const [eventParticipantSearch, setEventParticipantSearch] = useState('');
+  const [marioKartSearch, setMarioKartSearch] = useState('');
 
   // Selected participant for direct viewing and editing
   const [selectedPersonForEdit, setSelectedPersonForEdit] = useState<Person | null>(null);
   const [editingPersonName, setEditingPersonName] = useState('');
   const [personEditLoading, setPersonEditLoading] = useState(false);
+  const [generatedPinData, setGeneratedPinData] = useState<{ personId: string; code: string; expiresAt: string } | null>(null);
+  const [pinGenerating, setPinGenerating] = useState(false);
 
   // Program & activity editing
   const [eventForm, setEventForm] = useState({
@@ -212,6 +224,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       'matches',
       'event_participants',
       'tabletennis_participants',
+      'mariokart',
       'activities',
       'alpha',
       'test',
@@ -717,6 +730,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Generate 24-hour one-time access PIN for participant
+  const handleGeneratePinForPerson = async (person: Person) => {
+    setPinGenerating(true);
+    try {
+      const res = await generatePersonAccessCode(person.id);
+      setGeneratedPinData({ personId: person.id, code: res.code, expiresAt: res.expiresAt });
+      onRefresh();
+      showToast(`PIN-kode ${res.code} generert for ${person.firstName}!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Kunne ikke generere PIN-kode', 'error');
+    } finally {
+      setPinGenerating(false);
+    }
+  };
+
+  const handleCopyPinCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    showToast(`PIN-kode ${code} kopiert!`, 'success');
+  };
+
+  const handleCopyPinSms = (code: string, person: Person) => {
+    const text = `Hei ${person.firstName}! Koden din til Lillesand United er ${code}. Åpne appen, trykk på det lille nøkkel-ikonet øverst til høyre i velkomstkortet og tast inn koden, så er du koblet til profilen din.`;
+    navigator.clipboard.writeText(text);
+    showToast('SMS-tekst kopiert!', 'success');
+  };
+
   // Toggle table tennis registration directly for participant
   const handleToggleTournamentInModal = async (person: Person, isCurrentlyRegistered: boolean, participantId?: string) => {
     setPersonEditLoading(true);
@@ -969,6 +1008,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     showToast('Alpha-interesselisten er kopiert til utklippstavlen!', 'success');
   };
 
+  // Manual register Mario Kart
+  const handleManualRegisterMarioKart = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newMarioKartName.trim();
+    if (!clean) return;
+    setMarioKartLoading(true);
+    try {
+      await registerMarioKart({ firstName: clean });
+      setNewMarioKartName('');
+      onRefresh();
+      showToast(`${clean} er nå påmeldt Mario Kart!`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Kunne ikke melde på Mario Kart.', 'error');
+    } finally {
+      setMarioKartLoading(false);
+    }
+  };
+
+  // Withdraw Mario Kart participant
+  const handleWithdrawMarioKartAdmin = async (participantId: string, name: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Meld av Mario Kart',
+      message: `Vil du melde ${name} av Mario Kart?`,
+      confirmLabel: 'Meld av',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await withdrawMarioKart({ participantId });
+          onRefresh();
+          showToast(`${name} ble meldt av Mario Kart.`, 'success');
+        } catch (err: any) {
+          showToast(err.message || 'Kunne ikke melde av.', 'error');
+        }
+      },
+    });
+  };
+
+  // Copy Mario Kart list
+  const handleCopyMarioKartList = () => {
+    const list = state.marioKartParticipants || [];
+    if (!list.length) return;
+    const text = list
+      .map(
+        (p, i) =>
+          `${i + 1}. ${p.displayId || p.firstName}${p.personId ? ` (${p.personId})` : ''} — ${new Date(
+            p.registeredAt
+          ).toLocaleString('no-NO')}`
+      )
+      .join('\n');
+    navigator.clipboard.writeText(text);
+    showToast('Mario Kart-listen er kopiert til utklippstavlen!', 'success');
+  };
+
   // ----------------------------------------------------
   // PIN LOCK SCREEN (Level B: Admin only)
   // ----------------------------------------------------
@@ -1071,6 +1164,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       tooltip: 'Deltakere bordtennis — påmeldte spillere i turneringen',
       icon: UserCheck,
       activeClass: 'bg-lime-400 text-zinc-950 border-zinc-950 shadow-artistic-sm',
+    },
+    {
+      id: 'mariokart',
+      shortLabel: 'MK',
+      countLabel: String((state.marioKartParticipants || []).length),
+      tooltip: 'Mario Kart & Gaming Lounge — liste over påmeldte og enkel påmeldingsadministrasjon',
+      icon: Gamepad2,
+      activeClass: 'bg-red-500 text-white border-zinc-950 shadow-artistic-sm',
     },
     {
       id: 'matches',
@@ -1462,6 +1563,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     (p.anonymousToken && a.clientToken === p.anonymousToken) ||
                     (a.name && (a.name === p.displayId || a.name === p.firstName))
                 );
+                const mkParticipant = (state.marioKartParticipants || []).find(
+                  (m) =>
+                    m.personId === p.id ||
+                    (p.displayId && m.displayId === p.displayId) ||
+                    m.firstName === p.firstName
+                );
 
                 return (
                   <div
@@ -1518,6 +1625,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </span>
                           {alpha ? (
                             <span className="font-bold text-purple-400">Interessert</span>
+                          ) : (
+                            <span className="text-zinc-500 font-medium">-</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-400 flex items-center gap-1">
+                            <Gamepad2 className="w-3 h-3 text-zinc-500" /> Mario Kart:
+                          </span>
+                          {mkParticipant ? (
+                            <span className="font-bold text-red-400">Påmeldt</span>
                           ) : (
                             <span className="text-zinc-500 font-medium">-</span>
                           )}
@@ -1639,6 +1757,107 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {tournament.participants.length === 0 && (
             <div className="p-8 text-center text-xs font-bold text-zinc-500">
               Ingen er påmeldt bordtennisturneringen.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------------- TAB: MARIO KART & GAMING LOUNGE ---------------- */}
+      {adminTab === 'mariokart' && (
+        <div className="p-6 rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-sm space-y-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-black text-white uppercase flex items-center gap-2">
+                <Gamepad2 className="w-5 h-5 text-red-500" />
+                Mario Kart & Gaming Lounge ({(state.marioKartParticipants || []).length} påmeldte)
+              </h3>
+              <p className="text-xs text-zinc-400 font-medium mt-1">
+                Enkel påmeldingsliste til Mario Kart. Meld på deltakere manuelt eller meld av.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyMarioKartList}
+              disabled={!(state.marioKartParticipants && state.marioKartParticipants.length > 0)}
+              className="px-4 py-2.5 rounded-2xl bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-artistic-sm active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer"
+            >
+              <Copy className="w-4 h-4" />
+              Kopier liste
+            </button>
+          </div>
+
+          {/* Form: Meld på manuelt */}
+          <form
+            onSubmit={handleManualRegisterMarioKart}
+            className="flex flex-col sm:flex-row items-stretch gap-2.5 p-4 rounded-2xl bg-zinc-950 border-2 border-zinc-800"
+          >
+            <input
+              type="text"
+              placeholder="Fornavn eller kallenavn på deltaker..."
+              value={newMarioKartName}
+              onChange={(e) => setNewMarioKartName(e.target.value)}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-900 border-2 border-zinc-800 text-white text-xs font-bold focus:outline-none focus:border-red-500"
+            />
+            <button
+              type="submit"
+              disabled={marioKartLoading || !newMarioKartName.trim()}
+              className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-artistic-sm cursor-pointer whitespace-nowrap"
+            >
+              <UserPlus className="w-4 h-4" />
+              {marioKartLoading ? 'Melder på...' : 'Meld på manuelt'}
+            </button>
+          </form>
+
+          {/* Søk i listen */}
+          <input
+            type="search"
+            placeholder="Søk i påmeldte til Mario Kart..."
+            value={marioKartSearch}
+            onChange={(e) => setMarioKartSearch(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-2xl bg-zinc-950 border-2 border-zinc-800 text-white text-xs font-bold focus:outline-none focus:border-red-500 shadow-artistic-sm"
+          />
+
+          {/* Liste over påmeldte */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 max-h-[480px] overflow-y-auto pr-1">
+            {(state.marioKartParticipants || [])
+              .filter((p) => {
+                const q = marioKartSearch.trim().toLowerCase();
+                if (!q) return true;
+                const label = (p.displayId || p.firstName).toLowerCase();
+                return label.includes(q) || p.firstName.toLowerCase().includes(q);
+              })
+              .map((p, idx) => (
+                <div
+                  key={p.id}
+                  className="p-3.5 rounded-2xl bg-zinc-950 border-2 border-zinc-800 hover:border-red-500/50 flex items-center justify-between shadow-artistic-sm transition-colors"
+                >
+                  <div className="min-w-0 pr-2">
+                    <span className="text-[10px] font-black text-red-400 block uppercase">#{idx + 1}</span>
+                    <strong className="text-sm font-black text-white block truncate">{p.displayId || p.firstName}</strong>
+                    <span className="text-[10px] text-zinc-500 font-mono block">
+                      {new Date(p.registeredAt).toLocaleTimeString('no-NO', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleWithdrawMarioKartAdmin(p.id, p.displayId || p.firstName)}
+                    className="p-2 text-zinc-500 hover:text-rose-400 transition-colors rounded-lg shrink-0 cursor-pointer"
+                    title="Meld av Mario Kart"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+          </div>
+
+          {(!state.marioKartParticipants || state.marioKartParticipants.length === 0) && (
+            <div className="p-8 text-center text-xs font-bold text-zinc-500">
+              Ingen er påmeldt Mario Kart enda.
             </div>
           )}
         </div>
@@ -2979,6 +3198,97 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Section 5: Gi tilgang til appen (Engangs-PIN) */}
+              {(() => {
+                const existingActiveCode = (state.personAccessCodes || []).find(
+                  (c) => c.personId === currentPersonInState.id && !c.usedAt && new Date(c.expiresAt).getTime() > Date.now()
+                );
+                const activeCodeToDisplay = generatedPinData?.personId === currentPersonInState.id
+                  ? generatedPinData.code
+                  : existingActiveCode?.code;
+
+                return (
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-zinc-300">
+                        <KeyRound className="w-4 h-4 text-amber-400" />
+                        <span>Gi tilgang til appen (Engangs-PIN)</span>
+                      </div>
+                      {activeCodeToDisplay ? (
+                        <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                          Aktiv kode klar
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500 font-bold">
+                          Ingen aktiv kode
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-zinc-400 font-medium">
+                      Generer en 6-sifret engangs-PIN som deltakeren taster inn via det lille nøkkel-ikonet i appen på sin telefon for å koble til profilen.
+                    </p>
+
+                    {activeCodeToDisplay ? (
+                      <div className="p-4 rounded-xl bg-zinc-950 border border-amber-500/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase block">Engangskode</span>
+                            <span className="text-2xl font-black font-mono tracking-widest text-amber-400">
+                              {activeCodeToDisplay}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-zinc-500 font-medium">
+                            Gyldig 24 timer • Én gangs bruk
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPinCode(activeCodeToDisplay)}
+                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-artistic-sm"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Kopier PIN</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCopyPinSms(activeCodeToDisplay, currentPersonInState)}
+                            className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-artistic-sm"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-lime-400" />
+                            <span>Kopier SMS-tekst</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={pinGenerating}
+                            onClick={() => handleGeneratePinForPerson(currentPersonInState)}
+                            className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-xs font-bold transition-all cursor-pointer ml-auto"
+                          >
+                            {pinGenerating ? 'Genererer...' : 'Ny kode'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <button
+                          type="button"
+                          disabled={pinGenerating}
+                          onClick={() => handleGeneratePinForPerson(currentPersonInState)}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-artistic-sm cursor-pointer disabled:opacity-50"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                          <span>{pinGenerating ? 'Genererer PIN...' : 'Generer PIN-kode for appen'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Footer Actions */}
               <div className="pt-2 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-3">

@@ -12,7 +12,7 @@ export const ActivityGrid: React.FC<ActivityGridProps> = ({
   onSelectActivity,
 }) => {
   const isClickableActivity = (id: string) => {
-    return id === 'act-tabletennis' || id === 'act-alpha' || id === 'act-kiosk';
+    return id === 'act-tabletennis' || id === 'act-alpha' || id === 'act-kiosk' || id === 'act-gaming';
   };
 
   // Only show active activities to the youth, sorted: clickable first, then info cards
@@ -28,10 +28,10 @@ export const ActivityGrid: React.FC<ActivityGridProps> = ({
       // Fixed sensible priority among clickable
       const priorityMap: Record<string, number> = {
         'act-tabletennis': 1,
-        'act-kiosk': 2,
-        'act-alpha': 3,
-        'act-football': 4,
-        'act-gaming': 5,
+        'act-gaming': 2,
+        'act-kiosk': 3,
+        'act-alpha': 4,
+        'act-football': 5,
         'act-gathering': 6,
       };
       return (priorityMap[a.id] || 99) - (priorityMap[b.id] || 99);
@@ -44,7 +44,7 @@ export const ActivityGrid: React.FC<ActivityGridProps> = ({
       case 'CircleDot':
         return <CircleDot className="w-6 h-6 text-emerald-400" />;
       case 'Gamepad2':
-        return <Gamepad2 className="w-6 h-6 text-indigo-400" />;
+        return <Gamepad2 className="w-6 h-6 text-red-500" />;
       case 'Music':
         return <Music className="w-6 h-6 text-rose-400" />;
       case 'Utensils':
@@ -75,6 +75,25 @@ export const ActivityGrid: React.FC<ActivityGridProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {visibleActivities.map((activity) => {
           const isClickable = isClickableActivity(activity.id);
+          const isMarioKart = activity.id === 'act-gaming';
+
+          let cardStyle = 'bg-zinc-950/80 border-zinc-800/90 shadow-artistic-sm';
+          if (isClickable) {
+            if (isMarioKart) {
+              cardStyle =
+                'group bg-gradient-to-b from-zinc-900 to-zinc-950 border-red-500 shadow-artistic-red hover:-translate-y-1.5 cursor-pointer';
+            } else if (activity.highlight) {
+              cardStyle =
+                'group bg-gradient-to-b from-zinc-900 to-zinc-950 border-lime-400 shadow-artistic-lime hover:-translate-y-1.5 cursor-pointer';
+            } else {
+              cardStyle =
+                'group bg-zinc-900 border-zinc-800 hover:border-lime-400 shadow-artistic-md hover:-translate-y-1.5 cursor-pointer';
+            }
+          }
+
+          const badgeText = isMarioKart && (activity.badge === 'Påmelding ved ankomst' || !activity.badge)
+            ? 'Digital påmelding'
+            : activity.badge;
 
           return (
             <div
@@ -83,42 +102,50 @@ export const ActivityGrid: React.FC<ActivityGridProps> = ({
               onClick={() => {
                 if (isClickable) onSelectActivity(activity.id);
               }}
-              className={`relative rounded-3xl p-6 border-2 transition-all duration-200 flex flex-col justify-between ${
-                isClickable
-                  ? activity.highlight
-                    ? 'group bg-gradient-to-b from-zinc-900 to-zinc-950 border-lime-400 shadow-artistic-lime hover:-translate-y-1.5 cursor-pointer'
-                    : 'group bg-zinc-900 border-zinc-800 hover:border-lime-400 shadow-artistic-md hover:-translate-y-1.5 cursor-pointer'
-                  : 'bg-zinc-950/80 border-zinc-800/90 shadow-artistic-sm'
-              }`}
+              className={`relative rounded-3xl p-6 border-2 transition-all duration-200 flex flex-col justify-between ${cardStyle}`}
             >
               <div>
                 {/* Header with icon & badge */}
                 <div className="flex items-start justify-between gap-3 mb-5">
-                  <div className={`w-14 h-14 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-center shrink-0 shadow-artistic-sm ${
-                    isClickable ? 'group-hover:scale-105 group-hover:border-zinc-700 transition-all' : ''
-                  }`}>
+                  <div
+                    className={`w-14 h-14 rounded-2xl bg-zinc-950 border-2 border-zinc-800 flex items-center justify-center shrink-0 shadow-artistic-sm ${
+                      isClickable
+                        ? isMarioKart
+                          ? 'group-hover:scale-105 group-hover:border-red-500/60 transition-all'
+                          : 'group-hover:scale-105 group-hover:border-zinc-700 transition-all'
+                        : ''
+                    }`}
+                  >
                     {getIcon(activity.iconName)}
                   </div>
 
                   <div className="flex flex-col items-end gap-1.5">
-                    {activity.badge && (
+                    {badgeText && (
                       <span
                         className={`text-xs font-black px-2.5 py-1 rounded-xl uppercase tracking-wider shadow-artistic-sm ${
-                          activity.highlight
+                          isMarioKart
+                            ? 'bg-red-500 text-white -rotate-2'
+                            : activity.highlight
                             ? 'bg-lime-400 text-zinc-950 -rotate-2'
                             : 'bg-zinc-950 text-zinc-200 border-2 border-zinc-800 rotate-1'
                         }`}
                       >
-                        {activity.badge}
+                        {badgeText}
                       </span>
                     )}
                   </div>
                 </div>
 
                 {/* Title & Short Description */}
-                <h3 className={`text-xl sm:text-2xl font-black text-white uppercase tracking-tight mb-2 transition-colors ${
-                  isClickable ? 'group-hover:text-lime-400' : ''
-                }`}>
+                <h3
+                  className={`text-xl sm:text-2xl font-black text-white uppercase tracking-tight mb-2 transition-colors ${
+                    isClickable
+                      ? isMarioKart
+                        ? 'group-hover:text-red-400'
+                        : 'group-hover:text-lime-400'
+                      : ''
+                  }`}
+                >
                   {activity.name}
                 </h3>
                 <p className="text-xs sm:text-sm text-zinc-400 mb-5 leading-relaxed font-medium">
@@ -140,10 +167,18 @@ export const ActivityGrid: React.FC<ActivityGridProps> = ({
                 </div>
 
                 {isClickable && (
-                  <div className="pt-3 flex items-center justify-between text-xs font-black text-lime-400 uppercase tracking-wider group-hover:translate-x-1 transition-transform">
+                  <div
+                    className={`pt-3 flex items-center justify-between text-xs font-black uppercase tracking-wider group-hover:translate-x-1 transition-transform ${
+                      isMarioKart
+                        ? 'text-red-400 group-hover:text-red-300'
+                        : 'text-lime-400 group-hover:text-lime-300'
+                    }`}
+                  >
                     <span>
                       {activity.id === 'act-tabletennis'
                         ? 'Se cup & meld på'
+                        : activity.id === 'act-gaming'
+                        ? 'Meld deg på Mario Kart'
                         : activity.id === 'act-alpha'
                         ? 'Meld interesse'
                         : 'Se meny & kiosk'}

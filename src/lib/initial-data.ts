@@ -37,13 +37,13 @@ export const INITIAL_ACTIVITIES: Activity[] = [
   {
     id: 'act-gaming',
     name: 'Mario Kart & Gaming Lounge',
-    shortDesc: 'Påmelding enkeltvis ved ankomst! Konkurranser, Mario Kart på storskjerm og lounge.',
-    fullDesc: 'Gaming på storskjerm og dedikerte spillstasjoner! Påmelding skjer enkeltvis ved ankomst i gaming-sonen (har foreløpig ikke digital turneringsmotor). Gaming og turnering starter kl. 18:45, finaler kl. 22:00 og premieutdeling kl. 22:30.',
+    shortDesc: 'Digital påmelding i appen! Konkurranser, Mario Kart på storskjerm og lounge.',
+    fullDesc: 'Gaming på storskjerm og dedikerte spillstasjoner! Meld deg på i appen. Gaming starter kl. 18:45, finaler kl. 22:00 og premieutdeling kl. 22:30.',
     iconName: 'Gamepad2',
-    time: 'Påmelding fra 17:00 • Gaming starter 18:45',
+    time: 'Digital påmelding fra 17:00 • Gaming starter 18:45',
     location: 'Gaming-hjørnet',
     enabled: true,
-    badge: 'Påmelding ved ankomst',
+    badge: 'Digital påmelding',
   },
   {
     id: 'act-gathering',
@@ -168,7 +168,9 @@ export const INITIAL_STATE: AppState = {
     spondUrl: '',
     spondButtonLabel: 'Meld deg på via Spond',
   },
+  marioKartParticipants: [],
   persons: [],
+  personAccessCodes: [],
 };
 
 /** Tom runtime-tilstand for full database-nullstilling (beholder fast program/aktiviteter). */
@@ -202,8 +204,10 @@ export function createEmptyAppState(): AppState {
       estimatedMinutesPerMatch: 10,
       bracketCapacity: TOURNAMENT_DEFAULT_CAPACITY,
     },
+    marioKartParticipants: [],
     alphaInterests: [],
     persons: [],
+    personAccessCodes: [],
   };
 }
 

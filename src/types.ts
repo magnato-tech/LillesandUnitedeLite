@@ -168,6 +168,15 @@ export interface AlphaSettings {
   spondButtonLabel?: string;
 }
 
+export interface MarioKartParticipant {
+  id: string; // e.g. "mk_..."
+  personId?: string | null;
+  displayId?: string | null;
+  firstName: string;
+  registeredAt: string;
+  userId?: string;
+}
+
 export interface PushSubscriptionTopic {
   active: boolean;
   expiresAt?: string | null;
@@ -192,6 +201,14 @@ export interface PushSubscriptionRecord {
   lastUsedAt?: string;
 }
 
+export interface PersonAccessCode {
+  code: string;
+  personId: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+}
+
 export interface AppState {
   event: {
     name: string;
@@ -208,7 +225,9 @@ export interface AppState {
   alphaSettings?: AlphaSettings;
   activities: Activity[];
   tournament: Tournament;
+  marioKartParticipants?: MarioKartParticipant[];
   alphaInterests: AlphaInterest[];
   persons: Person[];
+  personAccessCodes?: PersonAccessCode[];
   updatedAt?: string;
 }

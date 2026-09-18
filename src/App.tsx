@@ -8,6 +8,7 @@ import { TableTennisView } from './components/TableTennisView';
 import { AlphaView } from './components/AlphaView';
 import { KioskSection } from './components/KioskSection';
 import { MyProfileView } from './components/MyProfileView';
+import { MarioKartView } from './components/MarioKartView';
 
 const DisplayScreen = React.lazy(() =>
   import('./components/DisplayScreen').then((m) => ({ default: m.DisplayScreen }))
@@ -37,12 +38,13 @@ import {
   StoredSession,
 } from './lib/userProfile';
 
-type AppTab = 'home' | 'profile' | 'tabletennis' | 'alpha' | 'kiosk' | 'display' | 'admin';
+type AppTab = 'home' | 'profile' | 'tabletennis' | 'alpha' | 'kiosk' | 'mariokart' | 'display' | 'admin';
 type AdminTab =
   | 'kiosk_popcorn'
   | 'matches'
   | 'event_participants'
   | 'tabletennis_participants'
+  | 'mariokart'
   | 'activities'
   | 'alpha'
   | 'test';
@@ -50,12 +52,13 @@ type AdminTab =
 const APP_TAB_KEY = 'lillesand_current_tab';
 const ADMIN_TAB_KEY = 'lillesand_admin_section';
 
-const VALID_APP_TABS: AppTab[] = ['home', 'profile', 'tabletennis', 'alpha', 'kiosk', 'display', 'admin'];
+const VALID_APP_TABS: AppTab[] = ['home', 'profile', 'tabletennis', 'alpha', 'kiosk', 'mariokart', 'display', 'admin'];
 const VALID_ADMIN_TABS: AdminTab[] = [
   'kiosk_popcorn',
   'matches',
   'event_participants',
   'tabletennis_participants',
+  'mariokart',
   'activities',
   'alpha',
   'test',
@@ -470,6 +473,7 @@ export default function App() {
     if (id === 'act-tabletennis') setCurrentTab('tabletennis');
     else if (id === 'act-alpha') setCurrentTab('alpha');
     else if (id === 'act-kiosk') setCurrentTab('kiosk');
+    else if (id === 'act-gaming') setCurrentTab('mariokart');
     else {
       // Jump to home and highlight
       setCurrentTab('home');
@@ -513,13 +517,17 @@ export default function App() {
           {currentTab === 'home' && (
             <>
               {!hasActiveUser && (
-                <WelcomeBanner onSetMyPlayer={handleSetMyPlayer} />
+                <WelcomeBanner
+                  onSetMyPlayer={handleSetMyPlayer}
+                  onClaimPerson={(person) => handleSelectPerson(person)}
+                />
               )}
               <EventHero
                 state={state}
                 onGoToTableTennis={() => setCurrentTab('tabletennis')}
                 onGoToAlpha={() => setCurrentTab('alpha')}
                 onGoToKiosk={() => setCurrentTab('kiosk')}
+                onGoToMarioKart={() => setCurrentTab('mariokart')}
                 activePersonId={activePersonId}
                 activePerson={effectiveActivePerson}
               />
@@ -540,6 +548,19 @@ export default function App() {
               onRefreshState={loadLatestState}
               activePersonId={activePersonId}
               activePerson={effectiveActivePerson}
+            />
+          )}
+
+          {currentTab === 'mariokart' && (
+            <MarioKartView
+              state={state}
+              onRefreshState={loadLatestState}
+              activePersonId={activePersonId}
+              activePerson={effectiveActivePerson}
+              currentUserName={currentUserName}
+              onBack={() => setCurrentTab('home')}
+              onOpenProfile={() => setCurrentTab('profile')}
+              onSelectPerson={handleSelectPerson}
             />
           )}
 

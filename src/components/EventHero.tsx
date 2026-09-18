@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Calendar, MapPin, Clock, Trophy, Sparkles, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Calendar, MapPin, Clock, Trophy, Sparkles, ChevronRight, CheckCircle2, Gamepad2 } from 'lucide-react';
 import { AppState, Person } from '../types';
 import { PopcornBongCard } from './PopcornBongCard';
 
@@ -8,6 +8,7 @@ interface EventHeroProps {
   onGoToTableTennis: () => void;
   onGoToAlpha: () => void;
   onGoToKiosk: () => void;
+  onGoToMarioKart: () => void;
   activePersonId?: string | null;
   activePerson?: Person | null;
 }
@@ -17,6 +18,7 @@ export const EventHero: React.FC<EventHeroProps> = ({
   onGoToTableTennis,
   onGoToAlpha,
   onGoToKiosk,
+  onGoToMarioKart,
   activePersonId = null,
   activePerson = null,
 }) => {
@@ -72,6 +74,34 @@ export const EventHero: React.FC<EventHeroProps> = ({
 
     return false;
   }, [state.tournament?.participants, activePersonId, activePerson]);
+
+  const isRegisteredInMarioKart = useMemo(() => {
+    const participants = state.marioKartParticipants || [];
+    if (!participants.length) return false;
+
+    const targetPersonId = activePersonId || activePerson?.id;
+    if (targetPersonId) {
+      if (participants.some((p) => p.personId === targetPersonId || p.id === targetPersonId)) {
+        return true;
+      }
+    }
+
+    if (activePerson?.displayId) {
+      const dId = activePerson.displayId.trim().toLowerCase();
+      if (participants.some((p) => p.displayId && p.displayId.trim().toLowerCase() === dId)) {
+        return true;
+      }
+    }
+
+    if (activePerson?.firstName) {
+      const fName = activePerson.firstName.trim().toLowerCase();
+      if (participants.some((p) => p.firstName && p.firstName.trim().toLowerCase() === fName)) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [state.marioKartParticipants, activePersonId, activePerson]);
 
   return (
     <div className="relative overflow-hidden rounded-3xl bg-zinc-900 border-2 border-zinc-800 shadow-artistic-md p-6 sm:p-10 mb-8">
@@ -160,7 +190,7 @@ export const EventHero: React.FC<EventHeroProps> = ({
           <button
             id="hero-join-cup-btn"
             onClick={onGoToTableTennis}
-            className="px-7 py-4 rounded-2xl bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-sm sm:text-base uppercase tracking-wider flex items-center gap-2.5 shadow-artistic-md transition-all active:translate-x-0.5 active:translate-y-0.5 -rotate-1 hover:rotate-0"
+            className="px-7 py-4 rounded-2xl bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-sm sm:text-base uppercase tracking-wider flex items-center gap-2.5 shadow-artistic-md transition-all active:translate-x-0.5 active:translate-y-0.5 -rotate-1 hover:rotate-0 cursor-pointer"
           >
             <Trophy className="w-5 h-5" />
             Meld deg på Bordtenniscup
@@ -168,10 +198,34 @@ export const EventHero: React.FC<EventHeroProps> = ({
           </button>
         )}
 
+        {/* Mario Kart Banner / CTA Button beside Bordtenniscup banner */}
+        {isRegisteredInMarioKart ? (
+          <button
+            id="hero-mariokart-registered-btn"
+            onClick={onGoToMarioKart}
+            type="button"
+            className="px-7 py-4 rounded-2xl bg-zinc-950 border-2 border-red-500 text-red-400 font-black text-sm sm:text-base uppercase tracking-wider flex items-center gap-2.5 shadow-artistic-sm transition-all active:translate-x-0.5 active:translate-y-0.5 rotate-1 hover:rotate-0 cursor-pointer"
+          >
+            <CheckCircle2 className="w-5 h-5 text-red-400 shrink-0" />
+            <span>Du er påmeldt Mario Kart</span>
+            <ChevronRight className="w-4 h-4 text-red-400" />
+          </button>
+        ) : (
+          <button
+            id="hero-join-mariokart-btn"
+            onClick={onGoToMarioKart}
+            className="px-7 py-4 rounded-2xl bg-red-500 hover:bg-red-400 text-white font-black text-sm sm:text-base uppercase tracking-wider flex items-center gap-2.5 shadow-artistic-md transition-all active:translate-x-0.5 active:translate-y-0.5 rotate-1 hover:rotate-0 cursor-pointer"
+          >
+            <Gamepad2 className="w-5 h-5 text-white" />
+            Meld deg på Mario Kart
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+
         <button
           id="hero-alpha-btn"
           onClick={onGoToAlpha}
-          className="px-6 py-4 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-black text-sm sm:text-base uppercase tracking-wider border-2 border-zinc-700 shadow-artistic-sm flex items-center gap-2 transition-all active:translate-x-0.5 active:translate-y-0.5 rotate-1 hover:rotate-0"
+          className="px-6 py-4 rounded-2xl bg-zinc-950 hover:bg-zinc-800 text-white font-black text-sm sm:text-base uppercase tracking-wider border-2 border-zinc-700 shadow-artistic-sm flex items-center gap-2 transition-all active:translate-x-0.5 active:translate-y-0.5 rotate-1 hover:rotate-0 cursor-pointer"
         >
           <Sparkles className="w-5 h-5 text-sky-400" />
           Info om UngdomsAlpha

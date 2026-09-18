@@ -51,6 +51,10 @@
   box-shadow: 4px 4px 0px 0px #a3e635;
 }
 
+.shadow-artistic-red {
+  box-shadow: 4px 4px 0px 0px #ef4444;
+}
+
 .shadow-artistic-orange {
   box-shadow: 4px 4px 0px 0px #f97316;
 }

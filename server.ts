@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
-import { AppState, Activity, Match, Participant, AlphaInterest, Person, PushSubscriptionRecord } from './src/types';
+import { AppState, Activity, Match, Participant, AlphaInterest, Person, PushSubscriptionRecord, MarioKartParticipant } from './src/types';
 import webpush from 'web-push';
 import { calculatePlayerQueueStatus } from './src/lib/tournament-notifications';
 import {
@@ -26,7 +26,7 @@ import {
 } from './src/lib/tournament';
 import { INITIAL_STATE, INITIAL_ACTIVITIES, INITIAL_POPCORN, createEmptyAppState, SIMULATION_NAMES_16, SIMULATION_NAMES_31, generateSimulationNames, TOURNAMENT_MAX_PARTICIPANTS, TOURNAMENT_DEFAULT_CAPACITY } from './src/lib/initial-data';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
+import { initializeFirestore, setLogLevel, doc, getDoc, setDoc, collection, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -42,11 +42,18 @@ let lastFirestoreSyncTime: string | null = null;
 let firestoreSyncError: string | null = null;
 
 try {
+  setLogLevel('silent');
   const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
   if (fs.existsSync(configPath)) {
     firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     const fbApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    firestoreDb = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+    firestoreDb = initializeFirestore(
+      fbApp,
+      {
+        experimentalForceLongPolling: true,
+      },
+      firebaseConfig.firestoreDatabaseId
+    );
     console.log('[Firestore] Initialized Firestore client for DB:', firebaseConfig.firestoreDatabaseId);
   }
 } catch (err) {
@@ -227,6 +234,9 @@ function loadState(): AppState {
           spondButtonLabel: 'Meld deg på via Spond',
         },
         activities: mergeActivitiesFromDisk(parsed.activities, INITIAL_ACTIVITIES),
+        marioKartParticipants: Array.isArray(parsed.marioKartParticipants)
+          ? parsed.marioKartParticipants
+          : [],
         persons,
       };
 
@@ -649,8 +659,126 @@ app.delete('/api/persons/:id', requireAdmin, (req, res) => {
   if (state.tournament.status === 'registration') {
     state.tournament.participants = state.tournament.participants.filter((p) => p.personId !== id);
   }
+  // Also remove from access codes
+  if (state.personAccessCodes) {
+    state.personAccessCodes = state.personAccessCodes.filter((c) => c.personId !== id);
+  }
   saveState();
   res.json({ success: true, state });
+});
+
+// Generate a 24-hour one-time PIN code for an existing person (Admin)
+app.post('/api/persons/:id/generate-code', requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const person = (state.persons || []).find((p) => p.id === id);
+  if (!person) {
+    return res.status(404).json({ error: 'Person ikke funnet.' });
+  }
+
+  if (!state.personAccessCodes) {
+    state.personAccessCodes = [];
+  }
+
+  // Deactivate any existing unused codes for this person
+  state.personAccessCodes = state.personAccessCodes.filter(
+    (c) => !(c.personId === id && !c.usedAt)
+  );
+
+  // Generate a random 6-digit numeric PIN
+  let code = '';
+  let unique = false;
+  while (!unique) {
+    code = Math.floor(100000 + Math.random() * 900000).toString();
+    const exists = state.personAccessCodes.some(
+      (c) => c.code === code && !c.usedAt && new Date(c.expiresAt).getTime() > Date.now()
+    );
+    if (!exists) unique = true;
+  }
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  state.personAccessCodes.push({
+    code,
+    personId: id,
+    createdAt: now.toISOString(),
+    expiresAt,
+    usedAt: null,
+  });
+
+  saveState();
+
+  res.json({
+    success: true,
+    code,
+    expiresAt,
+  });
+});
+
+// Rate limiting map for code claiming (brute force protection)
+const claimCodeAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
+// Claim one-time PIN code to link device to existing person profile
+app.post('/api/persons/claim-code', (req, res) => {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const attempt = claimCodeAttempts.get(ip);
+  if (attempt && attempt.lockedUntil > now) {
+    const waitSec = Math.ceil((attempt.lockedUntil - now) / 1000);
+    return res.status(429).json({
+      error: `For mange forsøk. Vennligst vent ${waitSec} sekunder før du prøver igjen.`,
+    });
+  }
+
+  const { code } = req.body || {};
+  if (!code || typeof code !== 'string') {
+    return res.status(400).json({ error: 'PIN-kode er påkrevd.' });
+  }
+
+  const cleanCode = code.replace(/\s+/g, '').trim();
+  if (cleanCode.length < 4 || cleanCode.length > 10) {
+    return res.status(400).json({ error: 'Ugyldig PIN-kodeformat.' });
+  }
+
+  if (!state.personAccessCodes) {
+    state.personAccessCodes = [];
+  }
+
+  const record = state.personAccessCodes.find(
+    (c) =>
+      c.code === cleanCode &&
+      !c.usedAt &&
+      new Date(c.expiresAt).getTime() > now
+  );
+
+  if (!record) {
+    const curr = claimCodeAttempts.get(ip) || { count: 0, lockedUntil: 0 };
+    curr.count += 1;
+    if (curr.count >= 5) {
+      curr.lockedUntil = now + 60 * 1000;
+      curr.count = 0;
+    }
+    claimCodeAttempts.set(ip, curr);
+    return res.status(400).json({
+      error: 'Ugyldig eller utløpt PIN-kode. Sjekk koden eller be arrangør om en ny.',
+    });
+  }
+
+  const person = (state.persons || []).find((p) => p.id === record.personId);
+  if (!person) {
+    return res.status(404).json({ error: 'Tilknyttet person ble ikke funnet.' });
+  }
+
+  // Mark code as used immediately (single-use)
+  record.usedAt = new Date().toISOString();
+  claimCodeAttempts.delete(ip);
+  saveState();
+
+  res.json({
+    success: true,
+    person,
+    state,
+  });
 });
 
 // Register participant for Table tennis
@@ -1243,6 +1371,116 @@ app.post('/api/alpha/interest', (req, res) => {
   state.alphaInterests.push(interest);
   saveState();
   res.json({ success: true, interest, state });
+});
+
+// ----------------------------------------------------
+// MARIO KART & GAMING LOUNGE REGISTRATION
+// ----------------------------------------------------
+
+// Register participant for Mario Kart (Public / Self or Admin)
+app.post('/api/mariokart/register', (req, res) => {
+  const { personId, firstName, anonymousToken, userId } = req.body || {};
+  const cleanPersonId = typeof personId === 'string' && personId.trim() ? personId.trim() : null;
+  const cleanToken = typeof anonymousToken === 'string' && anonymousToken.trim() ? anonymousToken.trim() : null;
+
+  let resolvedPerson: Person | null = null;
+  if (cleanPersonId) {
+    resolvedPerson = (state.persons || []).find((p) => p.id === cleanPersonId) || null;
+    if (!resolvedPerson) {
+      return res.status(404).json({ error: 'Personen ble ikke funnet.' });
+    }
+  } else if (cleanToken) {
+    resolvedPerson = (state.persons || []).find((p) => p.anonymousToken === cleanToken) || null;
+  }
+
+  const rawName = resolvedPerson ? resolvedPerson.firstName : firstName;
+  if (!rawName || typeof rawName !== 'string' || !rawName.trim()) {
+    return res.status(400).json({ error: 'Fornavn er påkrevd for påmelding.' });
+  }
+
+  const cleanName = rawName.trim();
+  const cleanUserId = typeof userId === 'string' && userId.trim() ? userId.trim() : undefined;
+
+  if (!Array.isArray(state.marioKartParticipants)) {
+    state.marioKartParticipants = [];
+  }
+
+  // Idempotency: Check if already registered
+  const existing = state.marioKartParticipants.find((p) => {
+    if (resolvedPerson && p.personId === resolvedPerson.id) return true;
+    if (cleanPersonId && p.personId === cleanPersonId) return true;
+    if (cleanUserId && p.userId === cleanUserId) return true;
+    return p.firstName.toLowerCase() === cleanName.toLowerCase();
+  });
+
+  if (existing) {
+    if (resolvedPerson) {
+      existing.personId = resolvedPerson.id;
+      existing.displayId = resolvedPerson.displayId;
+      existing.firstName = resolvedPerson.firstName;
+    }
+    if (cleanUserId && !existing.userId) {
+      existing.userId = cleanUserId;
+    }
+    saveState();
+    return res.json({ success: true, participant: existing, state, alreadyRegistered: true });
+  }
+
+  const participant: MarioKartParticipant = {
+    id: 'mk_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    personId: resolvedPerson ? resolvedPerson.id : (cleanPersonId || null),
+    displayId: resolvedPerson ? resolvedPerson.displayId : cleanName,
+    firstName: resolvedPerson ? resolvedPerson.firstName : cleanName,
+    registeredAt: new Date().toISOString(),
+    userId: cleanUserId,
+  };
+
+  state.marioKartParticipants.push(participant);
+  state.updatedAt = new Date().toISOString();
+  saveState();
+
+  res.json({ success: true, participant, state });
+});
+
+// Withdraw / unregister participant from Mario Kart (Public or Admin)
+app.post('/api/mariokart/withdraw', (req, res) => {
+  const { participantId, personId, anonymousToken } = req.body || {};
+  const adminPinHeader = req.headers['x-admin-pin'] as string | undefined;
+  const isAdmin = adminPinHeader === ADMIN_PIN;
+
+  if (!Array.isArray(state.marioKartParticipants) || state.marioKartParticipants.length === 0) {
+    return res.status(404).json({ error: 'Ingen påmeldte funnet.' });
+  }
+
+  const cleanPartId = typeof participantId === 'string' && participantId.trim() ? participantId.trim() : null;
+  const cleanPersonId = typeof personId === 'string' && personId.trim() ? personId.trim() : null;
+  const cleanToken = typeof anonymousToken === 'string' && anonymousToken.trim() ? anonymousToken.trim() : null;
+
+  const targetIndex = state.marioKartParticipants.findIndex((p) => {
+    if (cleanPartId && p.id === cleanPartId) return true;
+    if (cleanPersonId && p.personId === cleanPersonId) return true;
+    return false;
+  });
+
+  if (targetIndex === -1) {
+    return res.status(404).json({ error: 'Påmelding ikke funnet.' });
+  }
+
+  const target = state.marioKartParticipants[targetIndex];
+
+  // If not admin and token is provided, verify identity if target is tied to a person
+  if (!isAdmin && cleanToken && target.personId) {
+    const person = (state.persons || []).find((p) => p.id === target.personId);
+    if (person && person.anonymousToken && person.anonymousToken !== cleanToken) {
+      return res.status(403).json({ error: 'Uautorisert avmelding.' });
+    }
+  }
+
+  state.marioKartParticipants.splice(targetIndex, 1);
+  state.updatedAt = new Date().toISOString();
+  saveState();
+
+  res.json({ success: true, state, removedParticipantId: target.id });
 });
 
 // Rename user across profile & activities while keeping same userId (Public)
@@ -1852,7 +2090,10 @@ app.post('/api/admin/reset-testdata', requireAdmin, (req, res) => {
   // 3. Reset Alpha interests
   state.alphaInterests = [];
 
-  // 4. Clean simulated persons, strictly preserving all real persons (isSimulated = false / undefined)
+  // 4. Reset Mario Kart participants (preserve real persons, clean participants)
+  state.marioKartParticipants = [];
+
+  // 5. Clean simulated persons, strictly preserving all real persons (isSimulated = false / undefined)
   if (state.persons && Array.isArray(state.persons)) {
     state.persons = state.persons.filter((p) => !p.isSimulated);
   }

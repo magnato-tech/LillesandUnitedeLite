@@ -1,17 +1,20 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, setLogLevel, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+
+// Silence verbose internal Firestore stream disconnection messages
+setLogLevel('silent');
 
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with the dedicated databaseId and auto-detect long polling
-// (Prevents GrpcConnection 'Listen' stream idle timeout errors in container/iframe sandbox)
+// Initialize Firestore with the dedicated databaseId and force long polling
+// (Eliminates GrpcConnection 'Listen' stream idle timeout errors in container/iframe sandbox)
 export const db = initializeFirestore(
   app,
   {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   },
   firebaseConfig.firestoreDatabaseId
 );
